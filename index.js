@@ -313,7 +313,6 @@ app.post('/init-database', async (req, res) => {
       await pool.query(`
         INSERT INTO restaurants (name, description, cuisine_type, address, city, state, zip_code, latitude, longitude, phone, email, website, price_range, rating, review_count, features, delivery_available, takeout_available, reservations_available)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-        ON CONFLICT (name) DO NOTHING
       `, [
         restaurant.name, restaurant.description, restaurant.cuisine_type,
         restaurant.address, restaurant.city, restaurant.state, restaurant.zip_code,
