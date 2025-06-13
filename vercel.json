@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "bitebase-backend-express",
+  "name": "bitebase-api",
   "builds": [
     {
       "src": "index.js",
@@ -27,7 +27,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "*"
+          "value": "https://beta.bitebase.app, https://bitebase.app, https://www.bitebase.app"
         },
         {
           "key": "Access-Control-Allow-Methods",
@@ -36,6 +36,10 @@
         {
           "key": "Access-Control-Allow-Headers",
           "value": "Content-Type, Authorization, X-User-ID, X-Session-ID"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
         }
       ]
     }

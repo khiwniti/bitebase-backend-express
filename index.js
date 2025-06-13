@@ -18,7 +18,13 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
-  origin: ['https://beta.bitebase.app', 'http://localhost:3000', 'https://localhost:3000'],
+  origin: [
+    'https://beta.bitebase.app', 
+    'https://bitebase.app',
+    'https://www.bitebase.app',
+    'http://localhost:3000', 
+    'https://localhost:3000'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-User-ID', 'X-Session-ID']
