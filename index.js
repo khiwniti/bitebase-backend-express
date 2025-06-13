@@ -79,6 +79,37 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Reset database endpoint (for development)
+app.post('/reset-database', async (req, res) => {
+  try {
+    console.log('🔄 Resetting database...');
+
+    // Drop tables in correct order (reverse of dependencies)
+    await pool.query('DROP TABLE IF EXISTS user_favorites CASCADE;');
+    await pool.query('DROP TABLE IF EXISTS analytics_events CASCADE;');
+    await pool.query('DROP TABLE IF EXISTS user_sessions CASCADE;');
+    await pool.query('DROP TABLE IF EXISTS restaurants CASCADE;');
+    await pool.query('DROP TABLE IF EXISTS users CASCADE;');
+
+    console.log('✅ Tables dropped successfully');
+
+    res.status(200).json({
+      success: true,
+      message: 'Database reset successfully',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Database reset failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Database reset failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Initialize database endpoint
 app.post('/init-database', async (req, res) => {
   try {
