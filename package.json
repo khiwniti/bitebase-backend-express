@@ -1,0 +1,30 @@
+{
+  "name": "bitebase-backend-express",
+  "version": "1.0.0",
+  "description": "BiteBase Express.js Backend API for Vercel",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "build": "echo 'Build complete'"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pg": "^8.16.0",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "express",
+    "api",
+    "restaurant",
+    "postgresql",
+    "vercel"
+  ],
+  "author": "BiteBase Team",
+  "license": "MIT"
+}
