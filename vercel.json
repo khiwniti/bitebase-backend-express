@@ -17,7 +17,8 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "DATABASE_URL": "postgresql://bitebase_db_admin:npg_sAvDzUnR40CV@ep-late-sun-a5x0yvpb-pooler.us-east-2.aws.neon.tech/beta-bitebase-prod?sslmode=require"
   },
   "headers": [
     {
