@@ -23,7 +23,9 @@ app.use(cors({
     'https://bitebase.app',
     'https://www.bitebase.app',
     'http://localhost:3000', 
-    'https://localhost:3000'
+    'https://localhost:3000',
+    'https://work-1-kiecgcykjhbecmxq.prod-runtime.all-hands.dev',
+    'https://work-2-kiecgcykjhbecmxq.prod-runtime.all-hands.dev'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
