@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 12001;
 
 // Database connection
 const pool = new Pool({
@@ -24,8 +24,10 @@ app.use(cors({
     'https://www.bitebase.app',
     'http://localhost:3000', 
     'https://localhost:3000',
-    'https://work-1-kiecgcykjhbecmxq.prod-runtime.all-hands.dev',
-    'https://work-2-kiecgcykjhbecmxq.prod-runtime.all-hands.dev'
+    'http://localhost:12000',
+    'https://localhost:12000',
+    'https://work-1-zxcpvmuyjxupkvcp.prod-runtime.all-hands.dev',
+    'https://work-2-zxcpvmuyjxupkvcp.prod-runtime.all-hands.dev'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -994,10 +996,12 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BiteBase Express.js Backend running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🗄️ Database: Connected to Neon PostgreSQL`);
+  console.log(`🔗 Backend URL: http://0.0.0.0:${PORT}`);
+  console.log(`🔗 External URL: https://work-2-zxcpvmuyjxupkvcp.prod-runtime.all-hands.dev`);
 });
 
 // Export for Vercel
