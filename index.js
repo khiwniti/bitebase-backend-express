@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -38,6 +38,19 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// Password hashing utilities using Node.js crypto
+const hashPassword = (password) => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+};
+
+const verifyPassword = (password, hashedPassword) => {
+  const [salt, hash] = hashedPassword.split(':');
+  const verifyHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  return hash === verifyHash;
+};
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -363,7 +376,7 @@ app.post('/init-database', async (req, res) => {
     ];
 
     for (const user of testUsers) {
-      const hashedPassword = await bcrypt.hash(user.password, 10);
+      const hashedPassword = hashPassword(user.password);
       await pool.query(`
         INSERT INTO users (email, password_hash, first_name, last_name, role)
         VALUES ($1, $2, $3, $4, $5)
@@ -699,9 +712,7 @@ app.post('/users', async (req, res) => {
     }
 
     // Hash password
-    const bcrypt = require('bcryptjs');
-    const saltRounds = 10;
-    const password_hash = await bcrypt.hash(password, saltRounds);
+    const password_hash = hashPassword(password);
 
     // Create user
     const result = await pool.query(`
@@ -713,10 +724,14 @@ app.post('/users', async (req, res) => {
     const user = result.rows[0];
 
     // Log analytics event
-    await pool.query(`
-      INSERT INTO analytics_events (event_type, data)
-      VALUES ('user_created', $1)
-    `, [JSON.stringify({ user_id: user.id, email: user.email })]);
+    try {
+      await pool.query(`
+        INSERT INTO analytics_events (event_type, event_data)
+        VALUES ('user_created', $1)
+      `, [JSON.stringify({ user_id: user.id, email: user.email })]);
+    } catch (analyticsError) {
+      console.log('Analytics logging failed:', analyticsError.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -817,8 +832,7 @@ app.post('/users/login', async (req, res) => {
     const user = result.rows[0];
 
     // Verify password
-    const bcrypt = require('bcryptjs');
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    const isValidPassword = verifyPassword(password, user.password_hash);
 
     if (!isValidPassword) {
       return res.status(401).json({
@@ -838,10 +852,14 @@ app.post('/users/login', async (req, res) => {
     `, [user.id, sessionToken, expiresAt]);
 
     // Log analytics event
-    await pool.query(`
-      INSERT INTO analytics_events (event_type, user_id, data)
-      VALUES ('user_login', $1, $2)
-    `, [user.id, JSON.stringify({ email: user.email })]);
+    try {
+      await pool.query(`
+        INSERT INTO analytics_events (event_type, event_data)
+        VALUES ('user_login', $1)
+      `, [JSON.stringify({ user_id: user.id, email: user.email })]);
+    } catch (analyticsError) {
+      console.log('Analytics logging failed:', analyticsError.message);
+    }
 
     res.json({
       success: true,
