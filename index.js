@@ -674,6 +674,239 @@ app.get('/analytics/dashboard', async (req, res) => {
   }
 });
 
+// User Management Endpoints
+
+// Create user endpoint
+app.post('/users', async (req, res) => {
+  try {
+    const { email, password, first_name, last_name, role = 'user' } = req.body;
+
+    // Validate required fields
+    if (!email || !password || !first_name || !last_name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: email, password, first_name, last_name'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
+
+    // Hash password
+    const bcrypt = require('bcryptjs');
+    const saltRounds = 10;
+    const password_hash = await bcrypt.hash(password, saltRounds);
+
+    // Create user
+    const result = await pool.query(`
+      INSERT INTO users (email, password_hash, first_name, last_name, role)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, email, first_name, last_name, role, created_at
+    `, [email, password_hash, first_name, last_name, role]);
+
+    const user = result.rows[0];
+
+    // Log analytics event
+    await pool.query(`
+      INSERT INTO analytics_events (event_type, data)
+      VALUES ('user_created', $1)
+    `, [JSON.stringify({ user_id: user.id, email: user.email })]);
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          role: user.role,
+          created_at: user.created_at
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create user',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// Get user by ID endpoint
+app.get('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT id, email, first_name, last_name, role, created_at, updated_at
+      FROM users 
+      WHERE id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Get user's favorite restaurants count
+    const favoritesResult = await pool.query(`
+      SELECT COUNT(*) as favorite_count
+      FROM user_favorites 
+      WHERE user_id = $1
+    `, [id]);
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          ...user,
+          favorite_restaurants_count: parseInt(favoritesResult.rows[0].favorite_count)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// User login endpoint
+app.post('/users/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    // Get user by email
+    const result = await pool.query(`
+      SELECT id, email, password_hash, first_name, last_name, role
+      FROM users 
+      WHERE email = $1
+    `, [email]);
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    const user = result.rows[0];
+
+    // Verify password
+    const bcrypt = require('bcryptjs');
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Create session token
+    const { v4: uuidv4 } = require('uuid');
+    const sessionToken = uuidv4();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await pool.query(`
+      INSERT INTO user_sessions (user_id, session_token, expires_at)
+      VALUES ($1, $2, $3)
+    `, [user.id, sessionToken, expiresAt]);
+
+    // Log analytics event
+    await pool.query(`
+      INSERT INTO analytics_events (event_type, user_id, data)
+      VALUES ('user_login', $1, $2)
+    `, [user.id, JSON.stringify({ email: user.email })]);
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          role: user.role
+        },
+        session: {
+          token: sessionToken,
+          expires_at: expiresAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// Get all users endpoint (for testing)
+app.get('/users', async (req, res) => {
+  try {
+    const { limit = 10, offset = 0 } = req.query;
+
+    const result = await pool.query(`
+      SELECT id, email, first_name, last_name, role, created_at
+      FROM users 
+      ORDER BY created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [parseInt(limit), parseInt(offset)]);
+
+    const countResult = await pool.query('SELECT COUNT(*) FROM users');
+    const totalUsers = parseInt(countResult.rows[0].count);
+
+    res.json({
+      success: true,
+      data: {
+        users: result.rows,
+        pagination: {
+          total: totalUsers,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          has_more: (parseInt(offset) + parseInt(limit)) < totalUsers
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get users',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 // Test endpoint
 app.get('/test', (req, res) => {
   res.status(200).json({
