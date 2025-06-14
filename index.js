@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 // Database connection
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://bitebase_db_admin:npg_sAvDzUnR40CV@ep-late-sun-a5x0yvpb-pooler.us-east-2.aws.neon.tech/beta-bitebase-prod?sslmode=require',
+  connectionString: process.env.DATABASE_URL || 'postgres://neondb_owner:npg_vS3jnaJFXm7R@ep-quiet-cell-a4f411kc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
   ssl: {
     rejectUnauthorized: false
   }
