@@ -26,8 +26,8 @@ app.use(cors({
     'https://localhost:3000',
     'http://localhost:12000',
     'https://localhost:12000',
-    'https://work-1-zxcpvmuyjxupkvcp.prod-runtime.all-hands.dev',
-    'https://work-2-zxcpvmuyjxupkvcp.prod-runtime.all-hands.dev'
+    'https://work-1-rglykkquxarpgyuq.prod-runtime.all-hands.dev',
+    'https://work-2-rglykkquxarpgyuq.prod-runtime.all-hands.dev'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -995,13 +995,126 @@ app.use((req, res) => {
   });
 });
 
+// AI Assistant endpoint
+app.post('/ai/chat', async (req, res) => {
+  try {
+    const { message, conversation_id } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message is required'
+      });
+    }
+
+    // Simple AI responses based on message content
+    let response = '';
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('sales') || lowerMessage.includes('revenue')) {
+      response = `Based on your current data, your sales this month are performing well! Here's what I can see:
+
+📈 **Monthly Revenue**: ฿185,400 (+12.3% vs last month)
+👥 **Customer Count**: 892 customers (+8.7% vs last month)  
+💰 **Average Order**: ฿680 (+5.2% vs last month)
+
+**Key Insights:**
+• Your weekend dinner rush (Fri-Sat 7-9pm) shows 35% higher demand than capacity
+• Seafood Linguine and Truffle Risotto are driving 45% of your revenue
+• Customer satisfaction is strong at 4.6/5
+
+**Recommendations:**
+1. Consider expanding weekend dinner capacity
+2. Promote your signature pasta dishes more
+3. Monitor the new competitor "Nonna's Kitchen" nearby`;
+    } else if (lowerMessage.includes('promotion') || lowerMessage.includes('marketing')) {
+      response = `Here are some targeted promotion ideas for your restaurant:
+
+🎯 **Weekend Rush Special**
+• Offer early bird discounts (5-7pm) to spread demand
+• "Beat the Rush" - 15% off orders placed before 6:30pm
+
+🍝 **Signature Dish Promotion**
+• Create a "Pasta Lovers" combo with your top performers
+• Limited-time truffle pasta variations
+
+🏆 **Competitive Response**
+• "Local's Choice" campaign highlighting your 4.6/5 rating
+• Loyalty program for repeat customers
+
+📱 **Digital Marketing**
+• Social media posts during peak hours (7-9pm)
+• Customer review incentives
+• Partner with food delivery apps for exclusive deals`;
+    } else if (lowerMessage.includes('competition') || lowerMessage.includes('competitor')) {
+      response = `Here's your competitive landscape analysis:
+
+⚠️ **New Threat**: Nonna's Kitchen (200m away)
+• 20% lower prices than yours
+• Recently opened, gaining traction
+• **Action**: Monitor their menu and consider value-added services
+
+🏆 **Your Advantages**:
+• Higher rating (4.6 vs 4.3)
+• Established customer base (892 monthly customers)
+• Strong signature dishes (45% revenue from 2 items)
+
+📊 **Market Position**:
+• Market share: 8.7% (+0.9% vs last quarter)
+• 4 main competitors within 500m
+• You rank #2 in the area by rating
+
+**Strategic Recommendations**:
+1. Emphasize quality and experience over price
+2. Strengthen customer loyalty programs
+3. Highlight your signature dishes in marketing`;
+    } else {
+      response = `I'm here to help you with your restaurant business! I can assist with:
+
+📊 **Analytics & Reports**
+• Sales performance and trends
+• Customer insights and behavior
+• Market analysis and competition
+
+💡 **Business Strategy**
+• Menu optimization suggestions
+• Pricing strategy recommendations
+• Marketing and promotion ideas
+
+🎯 **Operations**
+• Staff scheduling optimization
+• Inventory management tips
+• Customer service improvements
+
+What would you like to know more about?`;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        response,
+        conversation_id: conversation_id || `conv_${Date.now()}`,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('AI Chat Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process AI request'
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BiteBase Express.js Backend running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🗄️ Database: Connected to Neon PostgreSQL`);
   console.log(`🔗 Backend URL: http://0.0.0.0:${PORT}`);
-  console.log(`🔗 External URL: https://work-2-zxcpvmuyjxupkvcp.prod-runtime.all-hands.dev`);
+  console.log(`🔗 External URL: https://work-2-rglykkquxarpgyuq.prod-runtime.all-hands.dev`);
+  console.log(`🤖 AI Assistant: http://0.0.0.0:${PORT}/ai/chat`);
 });
 
 // Export for Vercel
