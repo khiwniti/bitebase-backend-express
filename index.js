@@ -26,8 +26,8 @@ app.use(cors({
     'https://localhost:3000',
     'http://localhost:12000',
     'https://localhost:12000',
-    'https://work-1-rglykkquxarpgyuq.prod-runtime.all-hands.dev',
-    'https://work-2-rglykkquxarpgyuq.prod-runtime.all-hands.dev'
+    'https://work-1-qctqfcbslblhfccl.prod-runtime.all-hands.dev',
+    'https://work-2-qctqfcbslblhfccl.prod-runtime.all-hands.dev'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -996,7 +996,7 @@ app.use((req, res) => {
 });
 
 // AI Assistant endpoint
-app.post('/ai/chat', async (req, res) => {
+app.post('/api/ai/chat', async (req, res) => {
   try {
     const { message, conversation_id } = req.body;
     
@@ -1107,14 +1107,58 @@ What would you like to know more about?`;
   }
 });
 
+// AI Chat History endpoint
+app.get('/api/ai/history/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // For demo purposes, return empty history
+    // In a real implementation, you would fetch from a chat_history table
+    res.json({
+      success: true,
+      history: [],
+      userId: userId,
+      limit: limit
+    });
+  } catch (error) {
+    console.error('AI History Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get chat history'
+    });
+  }
+});
+
+// AI Clear Chat endpoint
+app.delete('/api/ai/clear/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // For demo purposes, just return success
+    // In a real implementation, you would clear the chat_history table
+    res.json({
+      success: true,
+      message: 'Chat history cleared',
+      userId: userId
+    });
+  } catch (error) {
+    console.error('AI Clear Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear chat history'
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BiteBase Express.js Backend running on port ${PORT}`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🗄️ Database: Connected to Neon PostgreSQL`);
   console.log(`🔗 Backend URL: http://0.0.0.0:${PORT}`);
-  console.log(`🔗 External URL: https://work-2-rglykkquxarpgyuq.prod-runtime.all-hands.dev`);
-  console.log(`🤖 AI Assistant: http://0.0.0.0:${PORT}/ai/chat`);
+  console.log(`🔗 External URL: https://work-2-qctqfcbslblhfccl.prod-runtime.all-hands.dev`);
+  console.log(`🤖 AI Assistant: http://0.0.0.0:${PORT}/api/ai/chat`);
 });
 
 // Export for Vercel
