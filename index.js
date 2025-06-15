@@ -10,25 +10,17 @@ const PORT = process.env.PORT || 12001;
 
 // Database connection
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgres://neondb_owner:npg_vS3jnaJFXm7R@ep-quiet-cell-a4f411kc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
-  ssl: {
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? {
     rejectUnauthorized: false
-  }
+  } : false
 });
 
 // Middleware
 app.use(cors({
-  origin: [
-    'https://beta.bitebase.app', 
-    'https://bitebase.app',
-    'https://www.bitebase.app',
-    'http://localhost:3000', 
-    'https://localhost:3000',
-    'http://localhost:12000',
-    'https://localhost:12000',
-    'https://work-1-qctqfcbslblhfccl.prod-runtime.all-hands.dev',
-    'https://work-2-qctqfcbslblhfccl.prod-runtime.all-hands.dev'
-  ],
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://beta.bitebase.app', 'https://bitebase.app', 'https://www.bitebase.app']
+    : ['http://localhost:12000', 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-User-ID', 'X-Session-ID']

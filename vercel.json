@@ -4,10 +4,7 @@
   "builds": [
     {
       "src": "index.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
+      "use": "@vercel/node"
     }
   ],
   "rewrites": [
@@ -17,30 +14,6 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production",
-    "DATABASE_URL": "postgres://neondb_owner:npg_vS3jnaJFXm7R@ep-quiet-cell-a4f411kc-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
-  },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://beta.bitebase.app, https://bitebase.app, https://www.bitebase.app"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, X-User-ID, X-Session-ID"
-        },
-        {
-          "key": "Access-Control-Allow-Credentials",
-          "value": "true"
-        }
-      ]
-    }
-  ]
+    "NODE_ENV": "production"
+  }
 }
