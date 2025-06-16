@@ -143,6 +143,73 @@ async function testBufferRadiusSearch() {
   }
 }
 
+// Additional test: Buffer radius adjustment
+async function testBufferRadiusAdjustment() {
+  console.log('\n🧪 Testing Buffer Radius Adjustment...');
+  
+  try {
+    // Set buffer radius preference
+    const setResponse = await axios.post(`${BASE_URL}/user/preferences/buffer-radius`, {
+      user_id: testUserId,
+      buffer_radius: 1.5
+    });
+
+    console.log('✅ Buffer radius preference set successfully:', setResponse.data);
+    
+    // Test realtime search with buffer radius adjustment
+    const searchResponse = await axios.post(`${BASE_URL}/restaurants/search/realtime`, {
+      latitude: testLocation.latitude,
+      longitude: testLocation.longitude,
+      initial_radius: 2,
+      buffer_radius_adjustment: 1.5,
+      min_results: 3,
+      buffer_zones: true,
+      user_id: testUserId,
+      follow_user_location: true,
+      limit: 10
+    });
+
+    console.log('✅ Real-time search with buffer radius successful:');
+    console.log(`   📍 Search center: ${searchResponse.data.data.search_params.center.latitude}, ${searchResponse.data.data.search_params.center.longitude}`);
+    console.log(`   📏 Core radius: ${searchResponse.data.data.search_params.final_radius_km}km`);
+    console.log(`   🔄 Buffer radius: ${searchResponse.data.data.search_params.buffer_radius_km}km`);
+    console.log(`   🎯 Effective radius: ${searchResponse.data.data.search_params.effective_radius_km}km`);
+    console.log(`   🏪 Restaurants found: ${searchResponse.data.data.total}`);
+    
+    if (searchResponse.data.data.core_buffer_distribution) {
+      console.log('   🎯 Distribution:');
+      console.log(`      Core results: ${searchResponse.data.data.core_buffer_distribution.core_results}`);
+      console.log(`      Buffer results: ${searchResponse.data.data.core_buffer_distribution.buffer_results}`);
+    }
+    
+    // Test nearby search with buffer radius
+    const nearbyResponse = await axios.post(`${BASE_URL}/restaurants/nearby`, {
+      latitude: testLocation.latitude,
+      longitude: testLocation.longitude,
+      radius: 2,
+      buffer_radius: 1.5,
+      user_id: testUserId,
+      real_time: true
+    });
+
+    console.log('✅ Nearby restaurants with buffer radius successful:');
+    console.log(`   📏 Core radius: ${nearbyResponse.data.data.search_params.radius_km}km`);
+    console.log(`   🔄 Buffer radius: ${nearbyResponse.data.data.search_params.buffer_radius_km}km`);
+    console.log(`   🎯 Effective radius: ${nearbyResponse.data.data.search_params.effective_radius_km}km`);
+    console.log(`   🏪 Total restaurants: ${nearbyResponse.data.data.total}`);
+    
+    if (nearbyResponse.data.data.distribution) {
+      console.log(`   🎯 Core results: ${nearbyResponse.data.data.distribution.core_radius_results}`);
+      console.log(`   🎯 Buffer results: ${nearbyResponse.data.data.distribution.buffer_zone_results}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Buffer radius adjustment test failed:', error.response?.data || error.message);
+    return false;
+  }
+}
+
 async function testLocationHistory() {
   console.log('\n🧪 Testing Location History...');
   
@@ -208,6 +275,7 @@ async function runAllTests() {
     { name: 'Location Preferences', fn: testLocationPreferences },
     { name: 'Real-time Search', fn: testRealtimeSearch },
     { name: 'Buffer Radius Search', fn: testBufferRadiusSearch },
+    { name: 'Buffer Radius Adjustment', fn: testBufferRadiusAdjustment },
     { name: 'Location History', fn: testLocationHistory },
     { name: 'Current Location', fn: testCurrentLocation }
   ];

@@ -253,6 +253,7 @@ app.post('/init-database', async (req, res) => {
         user_id VARCHAR(255) NOT NULL UNIQUE,
         default_search_radius DECIMAL(5, 2) DEFAULT 5.0,
         max_search_radius DECIMAL(5, 2) DEFAULT 20.0,
+        buffer_radius DECIMAL(5, 2) DEFAULT 1.0,
         location_sharing_enabled BOOLEAN DEFAULT true,
         auto_location_update BOOLEAN DEFAULT true,
         distance_unit VARCHAR(10) DEFAULT 'km',
@@ -270,6 +271,21 @@ app.post('/init-database', async (req, res) => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_user_locations_coords ON user_locations(latitude, longitude);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_user_locations_user ON user_locations(user_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_user_locations_updated ON user_locations(updated_at);');
+    
+    // Add spatial index for efficient real-time location-based searches
+    try {
+      // Try to create PostGIS extension if not exists
+      await pool.query('CREATE EXTENSION IF NOT EXISTS postgis');
+      // Create spatial index if PostGIS is available
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_user_locations_postgis 
+        ON user_locations 
+        USING GIST (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326))
+      `);
+      console.log('✅ PostGIS spatial index created successfully');
+    } catch (error) {
+      console.log('⚠️ PostGIS spatial index not created (PostGIS not available)');
+    }
 
     // Create vector indexes for similarity search
     try {
@@ -2130,6 +2146,25 @@ app.post('/restaurants/nearby', async (req, res) => {
       east: longitude + lngDelta,
       west: longitude - lngDelta
     };
+    
+    // Get user preferences if available
+    let userPreferences = null;
+    if (req.body.user_id) {
+      try {
+        const prefsResult = await pool.query(`
+          SELECT default_search_radius, max_search_radius, location_sharing_enabled, auto_location_update, distance_unit
+          FROM user_preferences
+          WHERE user_id = $1
+        `, [req.body.user_id]);
+        
+        if (prefsResult.rows.length > 0) {
+          userPreferences = prefsResult.rows[0];
+          console.log(`📋 Using preferences for user ${req.body.user_id}`);
+        }
+      } catch (prefsError) {
+        console.warn('Could not retrieve user preferences:', prefsError.message);
+      }
+    }
 
     // Try to get real data from database first
     let dbRestaurants = [];
@@ -2178,129 +2213,134 @@ app.post('/restaurants/nearby', async (req, res) => {
     }
 
     // Generate mock restaurants with real-time positioning
-    const generateMockRestaurants = (centerLat, centerLng, searchRadius) => [
-      {
-        id: 1,
-        name: "Gaggan Anand",
-        latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
-        longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
-        address: "68/1 Soi Langsuan, Ploenchit Rd, Lumpini",
-        cuisine: "Progressive Indian",
-        price_range: "฿฿฿฿",
-        rating: 4.8,
-        review_count: 2847,
-        platform: "wongnai",
-        platform_id: "gaggan-anand-wongnai",
-        phone: "+66 2 652 1700",
-        website: "https://www.gaggan.com",
-        hours: "18:00-23:00",
-        features: ["Fine Dining", "Tasting Menu", "Wine Pairing"],
-        images: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400",
-        description: "Progressive Indian cuisine with molecular gastronomy techniques",
-        delivery_available: "No",
-        takeout_available: "No",
-        reservations_available: "Yes",
-        distance: Math.random() * searchRadius,
-        last_updated: new Date().toISOString()
-      },
-      {
-        id: 2,
-        name: "Sorn",
-        latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
-        longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
-        address: "56 Sukhumvit 26, Khlong Tan",
-        cuisine: "Southern Thai",
-        price_range: "฿฿฿",
-        rating: 4.7,
-        review_count: 1523,
-        platform: "google",
-        platform_id: "sorn-restaurant-google",
-        phone: "+66 2 663 3710",
-        website: "https://www.sornrestaurant.com",
-        hours: "18:30-22:30",
-        features: ["Authentic", "Local Ingredients", "Chef's Table"],
-        images: "https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400",
-        description: "Authentic Southern Thai cuisine using traditional recipes",
-        delivery_available: "No",
-        takeout_available: "Limited",
-        reservations_available: "Yes",
-        distance: Math.random() * searchRadius,
-        last_updated: new Date().toISOString()
-      },
-      {
-        id: 3,
-        name: "Le Du",
-        latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
-        longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
-        address: "399/3 Silom Rd, Silom",
-        cuisine: "Modern Thai",
-        price_range: "฿฿฿",
-        rating: 4.6,
-        review_count: 987,
-        platform: "wongnai",
-        platform_id: "le-du-wongnai",
-        phone: "+66 2 919 9918",
-        website: "https://www.ledubkk.com",
-        hours: "18:00-23:00",
-        features: ["Modern Thai", "Local Ingredients", "Wine List"],
-        images: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400",
-        description: "Contemporary Thai cuisine with local ingredients",
-        delivery_available: "No",
-        takeout_available: "No",
-        reservations_available: "Yes",
-        distance: Math.random() * searchRadius,
-        last_updated: new Date().toISOString()
-      },
-      {
-        id: 4,
-        name: "Paste Bangkok",
-        latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
-        longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
-        address: "999/9 Ploenchit Rd, Lumpini",
-        cuisine: "Thai Fine Dining",
-        price_range: "฿฿฿฿",
-        rating: 4.5,
-        review_count: 1456,
-        platform: "google",
-        platform_id: "paste-bangkok-google",
-        phone: "+66 2 656 1003",
-        website: "https://www.pastebangkok.com",
-        hours: "18:00-22:30",
-        features: ["Fine Dining", "Traditional Recipes", "Premium Ingredients"],
-        images: "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400",
-        description: "Refined Thai cuisine using traditional recipes and premium ingredients",
-        delivery_available: "No",
-        takeout_available: "No",
-        reservations_available: "Yes",
-        distance: Math.random() * searchRadius,
-        last_updated: new Date().toISOString()
-      },
-      {
-        id: 5,
-        name: "Baan Tepa",
-        latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
-        longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
-        address: "69 Soi Sukhumvit 53, Khlong Tan Nuea",
-        cuisine: "Thai",
-        price_range: "฿฿",
-        rating: 4.4,
-        review_count: 2134,
-        platform: "wongnai",
-        platform_id: "baan-tepa-wongnai",
-        phone: "+66 2 662 0550",
-        website: "https://www.baantepa.com",
-        hours: "11:30-14:30, 17:30-22:00",
-        features: ["Traditional", "Garden Setting", "Family Recipes"],
-        images: "https://images.unsplash.com/photo-1559847844-d721426d6edc?w=400",
-        description: "Traditional Thai cuisine in a beautiful garden setting",
-        delivery_available: "Yes",
-        takeout_available: "Yes",
-        reservations_available: "Yes"
-      }
-    ];
+    const generateMockRestaurants = (centerLat, centerLng, searchRadius, bufferRadius = 0) => {
+      // Total effective radius including buffer
+      const effectiveRadius = searchRadius + bufferRadius;
+      
+      return [
+        {
+          id: 1,
+          name: "Gaggan Anand",
+          latitude: centerLat + (Math.random() - 0.5) * (effectiveRadius / 111),
+          longitude: centerLng + (Math.random() - 0.5) * (effectiveRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
+          address: "68/1 Soi Langsuan, Ploenchit Rd, Lumpini",
+          cuisine: "Progressive Indian",
+          price_range: "฿฿฿฿",
+          rating: 4.8,
+          review_count: 2847,
+          platform: "wongnai",
+          platform_id: "gaggan-anand-wongnai",
+          phone: "+66 2 652 1700",
+          website: "https://www.gaggan.com",
+          hours: "18:00-23:00",
+          features: ["Fine Dining", "Tasting Menu", "Wine Pairing"],
+          images: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400",
+          description: "Progressive Indian cuisine with molecular gastronomy techniques",
+          delivery_available: "No",
+          takeout_available: "No",
+          reservations_available: "Yes",
+          distance: null, // Will be calculated properly later
+          last_updated: new Date().toISOString()
+        },
+        {
+          id: 2,
+          name: "Sorn",
+          latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
+          longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
+          address: "56 Sukhumvit 26, Khlong Tan",
+          cuisine: "Southern Thai",
+          price_range: "฿฿฿",
+          rating: 4.7,
+          review_count: 1523,
+          platform: "google",
+          platform_id: "sorn-restaurant-google",
+          phone: "+66 2 663 3710",
+          website: "https://www.sornrestaurant.com",
+          hours: "18:30-22:30",
+          features: ["Authentic", "Local Ingredients", "Chef's Table"],
+          images: "https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400",
+          description: "Authentic Southern Thai cuisine using traditional recipes",
+          delivery_available: "No",
+          takeout_available: "Limited",
+          reservations_available: "Yes",
+          distance: Math.random() * searchRadius,
+          last_updated: new Date().toISOString()
+        },
+        {
+          id: 3,
+          name: "Le Du",
+          latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
+          longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
+          address: "399/3 Silom Rd, Silom",
+          cuisine: "Modern Thai",
+          price_range: "฿฿฿",
+          rating: 4.6,
+          review_count: 987,
+          platform: "wongnai",
+          platform_id: "le-du-wongnai",
+          phone: "+66 2 919 9918",
+          website: "https://www.ledubkk.com",
+          hours: "18:00-23:00",
+          features: ["Modern Thai", "Local Ingredients", "Wine List"],
+          images: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400",
+          description: "Contemporary Thai cuisine with local ingredients",
+          delivery_available: "No",
+          takeout_available: "No",
+          reservations_available: "Yes",
+          distance: Math.random() * searchRadius,
+          last_updated: new Date().toISOString()
+        },
+        {
+          id: 4,
+          name: "Paste Bangkok",
+          latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
+          longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
+          address: "999/9 Ploenchit Rd, Lumpini",
+          cuisine: "Thai Fine Dining",
+          price_range: "฿฿฿฿",
+          rating: 4.5,
+          review_count: 1456,
+          platform: "google",
+          platform_id: "paste-bangkok-google",
+          phone: "+66 2 656 1003",
+          website: "https://www.pastebangkok.com",
+          hours: "18:00-22:30",
+          features: ["Fine Dining", "Traditional Recipes", "Premium Ingredients"],
+          images: "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400",
+          description: "Refined Thai cuisine using traditional recipes and premium ingredients",
+          delivery_available: "No",
+          takeout_available: "No",
+          reservations_available: "Yes",
+          distance: Math.random() * searchRadius,
+          last_updated: new Date().toISOString()
+        },
+        {
+          id: 5,
+          name: "Baan Tepa",
+          latitude: centerLat + (Math.random() - 0.5) * (searchRadius / 111),
+          longitude: centerLng + (Math.random() - 0.5) * (searchRadius / (111 * Math.cos(centerLat * Math.PI / 180))),
+          address: "69 Soi Sukhumvit 53, Khlong Tan Nuea",
+          cuisine: "Thai",
+          price_range: "฿฿",
+          rating: 4.4,
+          review_count: 2134,
+          platform: "wongnai",
+          platform_id: "baan-tepa-wongnai",
+          phone: "+66 2 662 0550",
+          website: "https://www.baantepa.com",
+          hours: "11:30-14:30, 17:30-22:00",
+          features: ["Traditional", "Garden Setting", "Family Recipes"],
+          images: "https://images.unsplash.com/photo-1559847844-d721426d6edc?w=400",
+          description: "Traditional Thai cuisine in a beautiful garden setting",
+          delivery_available: "Yes",
+          takeout_available: "Yes",
+          reservations_available: "Yes"
+        }
+      ];
+    };
 
     // Generate mock restaurants with real-time positioning
-    const mockRestaurants = generateMockRestaurants(latitude, longitude, searchRadius);
+    const mockRestaurants = generateMockRestaurants(latitude, longitude, radius, buffer_radius);
 
     // Combine database and mock results
     let allRestaurants = [...dbRestaurants];
@@ -2317,6 +2357,11 @@ app.post('/restaurants/nearby', async (req, res) => {
       // Calculate accurate distance using Haversine formula
       const distance = calculateDistance(latitude, longitude, restaurant.latitude, restaurant.longitude);
       restaurant.distance = distance;
+      restaurant.distance_km = Math.round(distance * 100) / 100; // Round to 2 decimal places
+      
+      // Mark restaurants as being in core radius or buffer zone
+      restaurant.is_in_core_radius = distance <= radius;
+      restaurant.is_in_buffer = distance > radius && distance <= searchRadius;
 
       // Apply radius filter (including buffer)
       if (distance > searchRadius) return false;
@@ -2381,13 +2426,32 @@ app.post('/restaurants/nearby', async (req, res) => {
             cuisine: cuisine_filter,
             price_range: price_range_filter,
             min_rating: rating_filter
-          }
+          },
+          user_preferences: userPreferences
+        },
+        distribution: {
+          core_radius_results: filteredRestaurants.filter(r => r.is_in_core_radius).length,
+          buffer_zone_results: filteredRestaurants.filter(r => r.is_in_buffer).length
         },
         platforms_searched: platforms || ['mock_data'],
         data_sources: {
           database_results: dbRestaurants.length,
           mock_results: mockRestaurants.length,
           total_before_filtering: allRestaurants.length
+        },
+        map_visualization: {
+          core_radius: {
+            center: { latitude, longitude },
+            radius_km: radius,
+            color: '#3388FF',
+            opacity: 0.6
+          },
+          buffer_zone: {
+            center: { latitude, longitude },
+            radius_km: searchRadius,
+            color: '#8899FF',
+            opacity: 0.3
+          }
         }
       },
       meta: {
@@ -2412,7 +2476,7 @@ app.post('/restaurants/nearby', async (req, res) => {
 
 // Real-time location tracking endpoints
 
-// Update user location
+// Update user location with enhanced tracking
 app.post('/user/location/update', async (req, res) => {
   try {
     const {
@@ -2423,7 +2487,9 @@ app.post('/user/location/update', async (req, res) => {
       heading,
       speed,
       user_id,
-      session_id
+      session_id,
+      timestamp,
+      device_info
     } = req.body;
 
     // Validate required parameters
@@ -2434,14 +2500,22 @@ app.post('/user/location/update', async (req, res) => {
       });
     }
 
+    // Validate coordinate ranges
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid coordinate values'
+      });
+    }
+
     // Use session_id if no user_id provided (anonymous tracking)
     const trackingId = user_id || session_id || `session_${Date.now()}`;
 
     try {
-      // Try to insert into database
+      // Try to insert into database with enhanced tracking
       await pool.query(`
-        INSERT INTO user_locations (user_id, latitude, longitude, accuracy, altitude, heading, speed, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        INSERT INTO user_locations (user_id, latitude, longitude, accuracy, altitude, heading, speed, device_info, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
         ON CONFLICT (user_id)
         DO UPDATE SET
           latitude = EXCLUDED.latitude,
@@ -2450,10 +2524,11 @@ app.post('/user/location/update', async (req, res) => {
           altitude = EXCLUDED.altitude,
           heading = EXCLUDED.heading,
           speed = EXCLUDED.speed,
+          device_info = EXCLUDED.device_info,
           updated_at = NOW()
-      `, [trackingId, latitude, longitude, accuracy, altitude, heading, speed]);
+      `, [trackingId, latitude, longitude, accuracy, altitude, heading, speed, JSON.stringify(device_info)]);
 
-      console.log(`📍 Location updated for ${trackingId}: ${latitude}, ${longitude}`);
+      console.log(`📍 Enhanced location updated for ${trackingId}: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`);
     } catch (dbError) {
       console.warn('Database location update failed:', dbError.message);
     }
@@ -2477,6 +2552,121 @@ app.post('/user/location/update', async (req, res) => {
     });
   }
 });
+
+// Real-time location streaming with restaurant updates
+app.post('/user/location/stream', async (req, res) => {
+  try {
+    const {
+      latitude,
+      longitude,
+      accuracy,
+      user_id,
+      session_id,
+      auto_search = true,
+      search_radius = 3,
+      max_results = 10,
+      include_nearby = true
+    } = req.body;
+
+    // Validate required parameters
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        error: 'Latitude and longitude are required'
+      });
+    }
+
+    const trackingId = user_id || session_id || `session_${Date.now()}`;
+
+    // Update location
+    try {
+      await pool.query(`
+        INSERT INTO user_locations (user_id, latitude, longitude, accuracy, created_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          accuracy = EXCLUDED.accuracy,
+          updated_at = NOW()
+      `, [trackingId, latitude, longitude, accuracy]);
+    } catch (dbError) {
+      console.warn('Location update failed:', dbError.message);
+    }
+
+    // Auto-search nearby restaurants if enabled
+    let restaurants = [];
+    let searchMetrics = null;
+
+    if (auto_search && include_nearby) {
+      try {
+        const searchStart = Date.now();
+        const searchResponse = await searchNearbyRestaurants({
+          latitude,
+          longitude,
+          radius: search_radius,
+          limit: max_results * 2
+        });
+        restaurants = searchResponse.restaurants || [];
+        const searchEnd = Date.now();
+
+        searchMetrics = {
+          search_time_ms: searchEnd - searchStart,
+          radius_km: search_radius,
+          results_found: restaurants.length,
+          location: { latitude, longitude }
+        };
+
+        // Limit results
+        restaurants = restaurants.slice(0, max_results);
+      } catch (error) {
+        console.warn('Auto-search failed:', error.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        tracking_id: trackingId,
+        location: { latitude, longitude, accuracy },
+        restaurants: restaurants,
+        search_metrics: searchMetrics,
+        timestamp: new Date().toISOString(),
+        location_context: {
+          area: getLocationArea(latitude, longitude),
+          district: getLocationDistrict(latitude, longitude)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Location streaming error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Location streaming failed'
+    });
+  }
+});
+
+// Helper functions for location context
+function getLocationArea(latitude, longitude) {
+  // Simple area detection based on Bangkok coordinates
+  if (latitude >= 13.7 && latitude <= 13.8 && longitude >= 100.5 && longitude <= 100.6) {
+    return 'Central Bangkok';
+  } else if (latitude >= 13.6 && latitude <= 13.9 && longitude >= 100.4 && longitude <= 100.7) {
+    return 'Greater Bangkok';
+  }
+  return 'Bangkok Metropolitan';
+}
+
+function getLocationDistrict(latitude, longitude) {
+  // Simple district detection - can be enhanced with more precise mapping
+  if (latitude >= 13.74 && latitude <= 13.76 && longitude >= 100.53 && longitude <= 100.56) {
+    return 'Sukhumvit';
+  } else if (latitude >= 13.75 && latitude <= 13.77 && longitude >= 100.49 && longitude <= 100.52) {
+    return 'Silom';
+  }
+  return 'Bangkok';
+}
 
 // Get current user location
 app.get('/user/location/current/:userId', async (req, res) => {
@@ -2540,11 +2730,13 @@ app.post('/restaurants/search/realtime', async (req, res) => {
       initial_radius = 2,
       max_radius = 15,
       min_results = 5,
+      buffer_radius_adjustment = 1, // Add buffer radius adjustment parameter
       cuisine_filter,
       price_range_filter,
       rating_filter = 0,
       limit = 20,
       buffer_zones = true,
+      follow_user_location = true, // Add follow user location parameter
       user_id,
       session_id
     } = req.body;
@@ -2556,19 +2748,20 @@ app.post('/restaurants/search/realtime', async (req, res) => {
       });
     }
 
-    // Update user location if provided
-    if (user_id || session_id) {
+    // Update user location if provided and follow_user_location is enabled
+    if ((user_id || session_id) && follow_user_location) {
       try {
         const trackingId = user_id || session_id;
         await pool.query(`
-          INSERT INTO user_locations (user_id, latitude, longitude, created_at)
-          VALUES ($1, $2, $3, NOW())
+          INSERT INTO user_locations (user_id, latitude, longitude, accuracy, created_at)
+          VALUES ($1, $2, $3, $4, NOW())
           ON CONFLICT (user_id)
           DO UPDATE SET
             latitude = EXCLUDED.latitude,
             longitude = EXCLUDED.longitude,
+            accuracy = EXCLUDED.accuracy,
             updated_at = NOW()
-        `, [trackingId, latitude, longitude]);
+        `, [trackingId, latitude, longitude, req.body.accuracy || null]);
         console.log(`📍 Location updated for ${trackingId}: ${latitude}, ${longitude}`);
       } catch (dbError) {
         console.warn('Location update failed:', dbError.message);
@@ -2585,11 +2778,12 @@ app.post('/restaurants/search/realtime', async (req, res) => {
     while (restaurants.length < min_results && currentRadius <= max_radius && searchAttempts < maxAttempts) {
       searchAttempts++;
 
-      // Search with current radius
+      // Search with current radius and apply buffer radius adjustment
       const searchResponse = await searchNearbyRestaurants({
         latitude,
         longitude,
         radius: currentRadius,
+        buffer_radius: buffer_radius_adjustment, // Pass buffer radius adjustment
         cuisine_filter,
         price_range_filter,
         rating_filter,
@@ -2598,17 +2792,17 @@ app.post('/restaurants/search/realtime', async (req, res) => {
 
       restaurants = searchResponse.restaurants;
 
-      console.log(`🔍 Search attempt ${searchAttempts}: radius=${currentRadius}km, found=${restaurants.length} restaurants`);
+      console.log(`🔍 Search attempt ${searchAttempts}: radius=${currentRadius}km, buffer=${buffer_radius_adjustment}km, found=${restaurants.length} restaurants`);
 
-      // If buffer zones enabled, categorize results by distance
+      // If buffer zones enabled, use the core/buffer categorization from searchNearbyRestaurants
       if (buffer_zones && restaurants.length > 0) {
         const innerRadius = currentRadius * 0.6; // 60% of current radius
         const middleRadius = currentRadius * 0.8; // 80% of current radius
 
         bufferZoneResults = {
-          inner_zone: restaurants.filter(r => r.distance <= innerRadius),
-          middle_zone: restaurants.filter(r => r.distance > innerRadius && r.distance <= middleRadius),
-          outer_zone: restaurants.filter(r => r.distance > middleRadius)
+          inner_zone: restaurants.filter(r => r.is_in_core_radius && r.distance <= innerRadius),
+          middle_zone: restaurants.filter(r => r.is_in_core_radius && r.distance > innerRadius),
+          outer_zone: restaurants.filter(r => r.is_in_buffer)
         };
       }
 
@@ -2632,22 +2826,29 @@ app.post('/restaurants/search/realtime', async (req, res) => {
           center: { latitude, longitude },
           initial_radius_km: initial_radius,
           final_radius_km: currentRadius,
+          buffer_radius_km: buffer_radius_adjustment,
+          effective_radius_km: currentRadius + buffer_radius_adjustment,
           max_radius_km: max_radius,
           search_attempts: searchAttempts,
           min_results_target: min_results,
-          buffer_zones_enabled: buffer_zones
+          buffer_zones_enabled: buffer_zones,
+          follow_user_location: follow_user_location
         },
         auto_adjustment: {
           radius_expanded: currentRadius > initial_radius,
           expansion_factor: Math.round((currentRadius / initial_radius) * 100) / 100,
           results_sufficient: restaurants.length >= min_results,
           search_efficiency: Math.round((restaurants.length / searchAttempts) * 100) / 100
+        },
+        core_buffer_distribution: {
+          core_results: restaurants.filter(r => r.is_in_core_radius).length,
+          buffer_results: restaurants.filter(r => r.is_in_buffer).length
         }
       },
       meta: {
         timestamp: new Date().toISOString(),
         search_type: 'realtime_auto_radius_with_buffers',
-        location_tracking: !!(user_id || session_id)
+        location_tracking: !!(user_id || session_id) && follow_user_location
       }
     };
 
@@ -2665,7 +2866,7 @@ app.post('/restaurants/search/realtime', async (req, res) => {
           restaurants: bufferZoneResults.middle_zone?.slice(0, 5) || []
         },
         outer_zone: {
-          radius_km: currentRadius,
+          radius_km: currentRadius + buffer_radius_adjustment,
           count: bufferZoneResults.outer_zone?.length || 0,
           restaurants: bufferZoneResults.outer_zone?.slice(0, 5) || []
         }
@@ -2874,15 +3075,27 @@ app.get('/user/location/history/:userId', async (req, res) => {
 
 // Helper function for nearby restaurant search
 async function searchNearbyRestaurants(params) {
-  const { latitude, longitude, radius, cuisine_filter, price_range_filter, rating_filter, limit } = params;
+  const { 
+    latitude, 
+    longitude, 
+    radius, 
+    buffer_radius = 0, // Add buffer_radius parameter with default value 0
+    cuisine_filter, 
+    price_range_filter, 
+    rating_filter, 
+    limit 
+  } = params;
+
+  // Apply buffer to the search radius
+  const effectiveRadius = radius + buffer_radius;
 
   // Generate mock restaurants for testing
   const mockRestaurants = [
     {
       id: 1,
       name: "Gaggan Anand",
-      latitude: latitude + (Math.random() - 0.5) * (radius / 111),
-      longitude: longitude + (Math.random() - 0.5) * (radius / (111 * Math.cos(latitude * Math.PI / 180))),
+      latitude: latitude + (Math.random() - 0.5) * (effectiveRadius / 111), // Use effectiveRadius
+      longitude: longitude + (Math.random() - 0.5) * (effectiveRadius / (111 * Math.cos(latitude * Math.PI / 180))),
       cuisine_type: "Progressive Indian",
       price_range: 4,
       rating: 4.8,
@@ -2892,8 +3105,8 @@ async function searchNearbyRestaurants(params) {
     {
       id: 2,
       name: "Sorn",
-      latitude: latitude + (Math.random() - 0.5) * (radius / 111),
-      longitude: longitude + (Math.random() - 0.5) * (radius / (111 * Math.cos(latitude * Math.PI / 180))),
+      latitude: latitude + (Math.random() - 0.5) * (effectiveRadius / 111), // Use effectiveRadius
+      longitude: longitude + (Math.random() - 0.5) * (effectiveRadius / (111 * Math.cos(latitude * Math.PI / 180))),
       cuisine_type: "Southern Thai",
       price_range: 3,
       rating: 4.7,
@@ -2903,8 +3116,8 @@ async function searchNearbyRestaurants(params) {
     {
       id: 3,
       name: "Le Du",
-      latitude: latitude + (Math.random() - 0.5) * (radius / 111),
-      longitude: longitude + (Math.random() - 0.5) * (radius / (111 * Math.cos(latitude * Math.PI / 180))),
+      latitude: latitude + (Math.random() - 0.5) * (effectiveRadius / 111), // Use effectiveRadius
+      longitude: longitude + (Math.random() - 0.5) * (effectiveRadius / (111 * Math.cos(latitude * Math.PI / 180))),
       cuisine_type: "Modern Thai",
       price_range: 3,
       rating: 4.6,
@@ -2914,8 +3127,8 @@ async function searchNearbyRestaurants(params) {
     {
       id: 4,
       name: "Street Food Paradise",
-      latitude: latitude + (Math.random() - 0.5) * (radius / 111),
-      longitude: longitude + (Math.random() - 0.5) * (radius / (111 * Math.cos(latitude * Math.PI / 180))),
+      latitude: latitude + (Math.random() - 0.5) * (effectiveRadius / 111), // Use effectiveRadius
+      longitude: longitude + (Math.random() - 0.5) * (effectiveRadius / (111 * Math.cos(latitude * Math.PI / 180))),
       cuisine_type: "Thai Street Food",
       price_range: 1,
       rating: 4.3,
@@ -2925,8 +3138,8 @@ async function searchNearbyRestaurants(params) {
     {
       id: 5,
       name: "Bella Vista Ristorante",
-      latitude: latitude + (Math.random() - 0.5) * (radius / 111),
-      longitude: longitude + (Math.random() - 0.5) * (radius / (111 * Math.cos(latitude * Math.PI / 180))),
+      latitude: latitude + (Math.random() - 0.5) * (effectiveRadius / 111), // Use effectiveRadius
+      longitude: longitude + (Math.random() - 0.5) * (effectiveRadius / (111 * Math.cos(latitude * Math.PI / 180))),
       cuisine_type: "Italian",
       price_range: 3,
       rating: 4.5,
@@ -2941,7 +3154,13 @@ async function searchNearbyRestaurants(params) {
     restaurant.distance = distance;
     restaurant.distance_km = Math.round(distance * 100) / 100; // Round to 2 decimal places
 
-    if (distance > radius) return false;
+    // Check if within the base radius (excluding buffer) for core results
+    restaurant.is_in_core_radius = distance <= radius;
+    // Check if within the buffer zone
+    restaurant.is_in_buffer = distance > radius && distance <= effectiveRadius;
+
+    // Include restaurants within the effective radius (base + buffer)
+    if (distance > effectiveRadius) return false;
     if (cuisine_filter && !restaurant.cuisine_type.toLowerCase().includes(cuisine_filter.toLowerCase())) return false;
     if (price_range_filter && restaurant.price_range > price_range_filter) return false;
     if (rating_filter > 0 && restaurant.rating < rating_filter) return false;
@@ -2959,7 +3178,9 @@ async function searchNearbyRestaurants(params) {
 
   return {
     restaurants: filteredRestaurants.slice(0, limit),
-    total: filteredRestaurants.length
+    total: filteredRestaurants.length,
+    core_results_count: filteredRestaurants.filter(r => r.is_in_core_radius).length,
+    buffer_results_count: filteredRestaurants.filter(r => r.is_in_buffer).length
   };
 }
 
@@ -3140,6 +3361,90 @@ app.post('/api/mcp/execute', async (req, res) => {
       success: false,
       error: error.message,
       tool: req.body.tool_name
+    });
+  }
+});
+
+// Update user buffer radius preference
+app.post('/user/preferences/buffer-radius', async (req, res) => {
+  try {
+    const {
+      user_id,
+      session_id,
+      buffer_radius = 1.0
+    } = req.body;
+
+    if (!user_id && !session_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID or session ID is required'
+      });
+    }
+
+    const trackingId = user_id || session_id;
+
+    try {
+      // Check if user preferences exist
+      const checkResult = await pool.query(
+        'SELECT id FROM user_preferences WHERE user_id = $1',
+        [trackingId]
+      );
+
+      if (checkResult.rows.length === 0) {
+        // Create new preferences with default values and specified buffer radius
+        await pool.query(`
+          INSERT INTO user_preferences (
+            user_id, 
+            default_search_radius, 
+            max_search_radius, 
+            buffer_radius,
+            location_sharing_enabled, 
+            auto_location_update, 
+            distance_unit, 
+            created_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `, [
+          trackingId,
+          5.0, // default search radius
+          20.0, // max search radius
+          buffer_radius,
+          true, // location sharing enabled
+          true, // auto location update
+          'km', // distance unit
+        ]);
+      } else {
+        // Update existing preferences with new buffer radius
+        await pool.query(`
+          UPDATE user_preferences
+          SET buffer_radius = $1, updated_at = NOW()
+          WHERE user_id = $2
+        `, [buffer_radius, trackingId]);
+      }
+
+      console.log(`⚙️ Buffer radius preference updated for ${trackingId}: ${buffer_radius}km`);
+
+      res.json({
+        success: true,
+        message: 'Buffer radius preference updated successfully',
+        data: {
+          user_id: trackingId,
+          buffer_radius: buffer_radius
+        }
+      });
+    } catch (dbError) {
+      console.error('Database error updating buffer radius preference:', dbError);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update buffer radius preference',
+        details: dbError.message
+      });
+    }
+  } catch (error) {
+    console.error('Error updating buffer radius preference:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process buffer radius preference update'
     });
   }
 });
