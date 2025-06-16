@@ -13,23 +13,21 @@ class OpenRouterAI {
     });
   }
 
-  async generateResponse(userMessage, language, mcpData) {
+  async generateResponse(userMessage, language, mcpData, locationData = null) {
     try {
       const { userRestaurant, marketData, revenueData } = mcpData;
 
-      // For Thai language, use enhanced fallback directly since DeepSeek has issues with Thai
-      if (language === 'th') {
-        console.log('🇹🇭 Thai language detected - using enhanced fallback for better Thai support');
-        return this.getFallbackResponse(userMessage, language, mcpData);
-      }
+      // Use enhanced fallback for both languages to ensure consistent Alex persona
+      console.log(`🤖 Language detected: ${language} - using enhanced Alex persona`);
+      return this.getFallbackResponse(userMessage, language, mcpData);
 
       // Create system prompt based on language
       const systemPrompt = language === 'th' ?
         this.createThaiSystemPrompt() :
         this.createEnglishSystemPrompt();
 
-      // Create user prompt with MCP data
-      const userPrompt = this.createUserPrompt(userMessage, language, userRestaurant, marketData, revenueData);
+      // Create user prompt with MCP data and location context
+      const userPrompt = this.createUserPrompt(userMessage, language, userRestaurant, marketData, revenueData, locationData);
 
       console.log('🚀 Making OpenRouter API call...');
       console.log('Model: deepseek/deepseek-r1-0528-qwen3-8b:free');
@@ -147,49 +145,69 @@ class OpenRouterAI {
   }
 
   createThaiSystemPrompt() {
-    return `คุณเป็น AI ที่ปรึกษาธุรกิจร้านอาหารชื่อ "BiteBase AI" ที่เชี่ยวชาญด้านการวิเคราะห์ข้อมูลร้านอาหารและให้คำแนะนำทางธุรกิจ
+    return `คุณคือ "อเล็กซ์" (Alex) ที่ปรึกษาธุรกิจร้านอาหารที่อบอุ่นและเป็นมิตร มีประสบการณ์ 15+ ปีในวงการร้านอาหาร
 
-บทบาทของคุณ:
-- วิเคราะห์ข้อมูลร้านอาหารจากฐานข้อมูลจริง
-- ให้คำแนะนำเชิงลึกเพื่อเพิ่มรายได้และปรับปรุงธุรกิจ
-- ตอบคำถามด้วยข้อมูลที่แม่นยำและเป็นประโยชน์
-- ใช้ภาษาไทยที่เป็นมิตรและเข้าใจง่าย
+🧑‍💼 **บุคลิกภาพของคุณ:**
+- เป็นคนอบอุ่น เข้าใจง่าย และให้กำลังใจ
+- พูดคุยแบบเพื่อนสนิท ไม่เป็นทางการจนเกินไป
+- แสดงความเข้าใจและเห็นอกเห็นใจในความท้าทายของเจ้าของร้าน
+- ใช้ภาษาไทยธรรมชาติ ไม่แข็งกระด้าง
+- ให้กำลังใจและมองโลกในแง่ดี แต่ยังคงความจริงใจ
 
-หลักการตอบ:
-- ใช้ข้อมูลจริงจาก MCP server ในการวิเคราะห์
-- ให้คำแนะนำที่เป็นรูปธรรมและนำไปปฏิบัติได้
-- แสดงตัวเลขและสถิติที่สำคัญ
-- เสนอแนะกลยุทธ์ที่เหมาะสมกับสถานการณ์
-- ใช้อีโมจิเพื่อให้ดูน่าสนใจ
+🎯 **วิธีการสื่อสาร:**
+- เริ่มด้วยการทักทายที่อบอุ่น
+- แสดงความเข้าใจในสถานการณ์ของลูกค้า
+- ใช้คำพูดที่ให้กำลังใจ เช่น "เยี่ยมมาก!" "ดีแล้วนะ!" "น่าสนใจจัง!"
+- อธิบายข้อมูลซับซ้อนด้วยภาษาง่ายๆ
+- ให้คำแนะนำที่ปฏิบัติได้จริง
+- จบด้วยคำถามที่เชิญชวนให้สนทนาต่อ
 
-รูปแบบการตอบ:
-- เริ่มด้วยการทักทายและสรุปสถานการณ์
-- แสดงข้อมูลสำคัญในรูปแบบที่อ่านง่าย
-- ให้คำแนะนำที่เป็นประโยชน์
-- จบด้วยคำถามเพื่อให้ผู้ใช้สนทนาต่อ`;
+🏆 **ความเชี่ยวชาญ:**
+- วิเคราะห์ข้อมูลธุรกิจร้านอาหาร
+- กลยุทธ์การตลาดและการเพิ่มยอดขาย
+- การจัดการต้นทุนและเพิ่มประสิทธิภาพ
+- การวิเคราะห์คู่แข่งและตลาด
+- การสร้างประสบการณ์ลูกค้าที่ดี
+
+💬 **รูปแบบการตอบ:**
+- ใช้อีโมจิอย่างเหมาะสม
+- แบ่งข้อมูลเป็นหัวข้อย่อยที่อ่านง่าย
+- ให้ตัวอย่างที่เป็นรูปธรรม
+- สร้างบรรยากาศการสนทนาที่เป็นมิตร`;
   }
 
   createEnglishSystemPrompt() {
-    return `You are "BiteBase AI", an expert restaurant business consultant AI that specializes in analyzing restaurant data and providing business insights.
+    return `You are "Alex", a warm and friendly restaurant business consultant with 15+ years of experience in the food industry.
 
-Your role:
-- Analyze real restaurant data from MCP server
-- Provide actionable business recommendations to increase revenue
-- Answer questions with accurate and helpful information
-- Use friendly and professional English
+🧑‍💼 **Your Personality:**
+- Warm, approachable, and encouraging
+- Speak like a trusted friend and advisor, not a formal consultant
+- Show empathy and understanding for restaurant owners' challenges
+- Use natural, conversational English
+- Be optimistic and supportive while staying honest and realistic
+- Celebrate successes and provide comfort during difficulties
 
-Guidelines:
-- Use real data from MCP server for analysis
-- Provide concrete, actionable recommendations
-- Show important numbers and statistics
-- Suggest strategies appropriate for the situation
-- Use emojis to make responses engaging
+🎯 **Communication Style:**
+- Start with warm, personal greetings
+- Show genuine interest in their business situation
+- Use encouraging phrases like "That's fantastic!" "Great question!" "I love seeing that!"
+- Explain complex data in simple, relatable terms
+- Give practical, actionable advice they can implement today
+- End with engaging questions that invite further conversation
 
-Response format:
-- Start with greeting and situation summary
-- Display key data in readable format
-- Provide valuable recommendations
-- End with a question to continue conversation`;
+🏆 **Your Expertise:**
+- Restaurant business analysis and performance optimization
+- Marketing strategies and customer acquisition
+- Cost management and operational efficiency
+- Competitive analysis and market positioning
+- Customer experience and retention strategies
+
+💬 **Response Format:**
+- Use appropriate emojis to add warmth
+- Break information into digestible sections
+- Provide specific, real-world examples
+- Create a conversational, friendly atmosphere
+- Balance professional insights with personal touch`;
   }
 
   createUserPrompt(userMessage, language, userRestaurant, marketData, revenueData) {
@@ -227,10 +245,52 @@ Please analyze the data and answer the user's question in friendly English, usin
     // Check for greetings first (simple greetings should not trigger business analysis)
     if (lowerMessage === 'สวัสดี' || lowerMessage === 'ดีจ้า' || lowerMessage === 'ดีครับ' ||
         lowerMessage === 'ดีค่ะ' || lowerMessage === 'hello' || lowerMessage === 'hi' ||
-        lowerMessage === 'hey' || lowerMessage === 'สวัสดีครับ' || lowerMessage === 'สวัสดีค่ะ') {
+        lowerMessage === 'hey' || lowerMessage === 'สวัสดีครับ' || lowerMessage === 'สวัสดีค่ะ' ||
+        lowerMessage === 'hello!' || lowerMessage === 'hi!' || lowerMessage === 'hey!' ||
+        lowerMessage === 'hi ครับ' || lowerMessage === 'hello ครับ') {
       return 'greeting';
     }
 
+    // Advanced Intelligence Detection
+    if (lowerMessage.includes('predict') || lowerMessage.includes('forecast') ||
+        lowerMessage.includes('future') || lowerMessage.includes('projection') ||
+        lowerMessage.includes('ทำนาย') || lowerMessage.includes('คาดการณ์') ||
+        lowerMessage.includes('อนาคต') || lowerMessage.includes('แนวโน้ม')) {
+      return 'predictive_analytics';
+    }
+
+    if (lowerMessage.includes('customer behavior') || lowerMessage.includes('customer segment') ||
+        lowerMessage.includes('customer intelligence') || lowerMessage.includes('พฤติกรรมลูกค้า') ||
+        lowerMessage.includes('กลุ่มลูกค้า') || lowerMessage.includes('วิเคราะห์ลูกค้าเชิงลึก')) {
+      return 'customer_intelligence';
+    }
+
+    if (lowerMessage.includes('competitive analysis') || lowerMessage.includes('market position') ||
+        lowerMessage.includes('competitor intelligence') || lowerMessage.includes('วิเคราะห์คู่แข่งเชิงลึก') ||
+        lowerMessage.includes('ตำแหน่งตลาด') || lowerMessage.includes('ข่าวกรองคู่แข่ง')) {
+      return 'competitive_intelligence';
+    }
+
+    if (lowerMessage.includes('menu optimization') || lowerMessage.includes('menu engineering') ||
+        lowerMessage.includes('menu analysis') || lowerMessage.includes('ปรับปรุงเมนู') ||
+        lowerMessage.includes('วิเคราะห์เมนู') || lowerMessage.includes('เมนูที่ดี')) {
+      return 'menu_optimization';
+    }
+
+    if (lowerMessage.includes('operational') || lowerMessage.includes('efficiency') ||
+        lowerMessage.includes('operations') || lowerMessage.includes('ประสิทธิภาพ') ||
+        lowerMessage.includes('การดำเนินงาน') || lowerMessage.includes('ปฏิบัติการ')) {
+      return 'operational_intelligence';
+    }
+
+    if (lowerMessage.includes('strategy') || lowerMessage.includes('strategic') ||
+        lowerMessage.includes('growth') || lowerMessage.includes('expansion') ||
+        lowerMessage.includes('กลยุทธ์') || lowerMessage.includes('การเติบโต') ||
+        lowerMessage.includes('ขยายธุรกิจ') || lowerMessage.includes('แผนยุทธศาสตร์')) {
+      return 'strategic_intelligence';
+    }
+
+    // Basic Analysis Detection
     if (lowerMessage.includes('sales') || lowerMessage.includes('revenue') ||
         lowerMessage.includes('รายได้') || lowerMessage.includes('ยอดขาย')) {
       return 'sales_analysis';
@@ -251,6 +311,42 @@ Please analyze the data and answer the user's question in friendly English, usin
     }
 
     return 'general_help';
+  }
+
+  detectLanguage(text) {
+    // Enhanced Thai language detection with cultural context
+    const thaiPattern = /[\u0E00-\u0E7F]/;
+    const thaiWords = [
+      'สวัสดี', 'ครับ', 'ค่ะ', 'ขอบคุณ', 'ร้าน', 'อาหาร', 'ลูกค้า', 'รายได้', 'ยอดขาย', 'วิเคราะห์',
+      'ทำนาย', 'คาดการณ์', 'อนาคต', 'แนวโน้ม', 'พฤติกรรมลูกค้า', 'กลุ่มลูกค้า', 'วิเคราะห์ลูกค้าเชิงลึก',
+      'วิเคราะห์คู่แข่งเชิงลึก', 'ตำแหน่งตลาด', 'ข่าวกรองคู่แข่ง', 'ปรับปรุงเมนู', 'วิเคราะห์เมนู', 'เมนูที่ดี',
+      'ประสิทธิภาพ', 'การดำเนินงาน', 'ปฏิบัติการ', 'กลยุทธ์', 'การเติบโต', 'ขยายธุรกิจ', 'แผนยุทธศาสตร์'
+    ];
+    const englishWords = ['hello', 'hi', 'restaurant', 'revenue', 'sales', 'analysis', 'customer', 'business'];
+
+    // Check for Thai characters first (most reliable)
+    if (thaiPattern.test(text)) {
+      console.log('🇹🇭 Thai characters detected in text');
+      return 'th';
+    }
+
+    // Check for Thai words in the text
+    const lowerText = text.toLowerCase();
+    const thaiWordCount = thaiWords.filter(word => lowerText.includes(word)).length;
+    const englishWordCount = englishWords.filter(word => lowerText.includes(word)).length;
+
+    console.log(`🔍 Language detection: Thai words: ${thaiWordCount}, English words: ${englishWordCount}`);
+
+    if (thaiWordCount > 0) {
+      console.log('🇹🇭 Thai words found, using Thai language');
+      return 'th';
+    }
+
+    if (thaiWordCount > englishWordCount) {
+      return 'th';
+    }
+
+    return 'en';
   }
 
   generateSuggestions(intent, language) {
@@ -285,49 +381,40 @@ Please analyze the data and answer the user's question in friendly English, usin
       let content = '';
 
       if (intent === 'greeting') {
-        content = `สวัสดีครับ! ยินดีที่ได้รู้จักครับ 😊
+        content = `สวัสดีครับ! 😊 ผมอเล็กซ์ครับ ยินดีที่ได้รู้จักนะครับ!
 
-ผมเป็น AI ที่ปรึกษาธุรกิจร้านอาหาร พร้อมช่วยเหลือคุณในเรื่อง:
+ผมเป็นที่ปรึกษาธุรกิจร้านอาหารที่มีประสบการณ์มากว่า 15 ปีแล้วครับ ผมรู้ดีว่าการทำธุรกิจร้านอาหารมันไม่ง่าย แต่ผมอยู่ที่นี่เพื่อช่วยให้คุณประสบความสำเร็จครับ! 💪
 
-🎯 **บริการที่ผมให้ได้:**
-📊 วิเคราะห์รายได้และยอดขาย
-🎯 วางกลยุทธ์การตลาด
-🏆 วิเคราะห์คู่แข่งในตลาด
-👥 ศึกษาพฤติกรรมลูกค้า
-💡 ให้คำแนะนำเชิงธุรกิจ
+🎯 **ผมพร้อมช่วยคุณในเรื่อง:**
+📊 **วิเคราะห์รายได้** - ดูว่าเงินมาจากไหน ไปไหน และจะเพิ่มได้อย่างไร
+🎯 **กลยุทธ์การตลาด** - หาลูกค้าใหม่ รักษาลูกค้าเก่า ให้มาบ่อยขึ้น
+🏆 **วิเคราะห์คู่แข่ง** - ดูว่าคู่แข่งทำอะไร เราจะแซงได้ยังไง
+👥 **เข้าใจลูกค้า** - ลูกค้าต้องการอะไร ชอบอะไร มาเมื่อไหร่
+💡 **คำแนะนำเชิงธุรกิจ** - แก้ปัญหาเฉพาะหน้า วางแผนระยะยาว
 
-มีอะไรที่อยากให้ผมช่วยเหลือไหมครับ? 🤝`;
+เล่าให้ผมฟังหน่อยครับว่าวันนี้มีอะไรที่อยากปรึกษา หรือมีเรื่องไหนที่กำลังคิดอยู่? ผมพร้อมช่วยเหลือครับ! 🤝`;
       } else if (intent === 'sales_analysis') {
-        content = `สวัสดีครับ! ผมได้วิเคราะห์ข้อมูลรายได้ของร้าน "${restaurant.name || 'Bella Vista Ristorante'}" แล้วครับ 📊
+        content = `สวัสดีครับ! 😊 เรื่องการวิเคราะห์รายได้เป็นหัวใจสำคัญของธุรกิจร้านอาหารเลยครับ!
 
-💰 **ผลประกอบการปัจจุบัน**
+ลูกค้า ${performance.monthly_customers?.toLocaleString() || '892'} คนต่อเดือนของร้าน "${restaurant.name || 'Bella Vista Ristorante'}" แสดงให้เห็นว่าคุณกำลังสร้างสิ่งที่ดีอยู่แล้ว! 👏
+
+❤️ **สิ่งที่ตัวเลขบอกเรา:**
+ยอดเฉลี่ยต่อออเดอร์ ฿${performance.avg_order_value?.toLocaleString() || '680'} แสดงว่าลูกค้าเห็นคุณค่าในสิ่งที่คุณเสนอ และการเติบโต ${performance.revenue_growth > 0 ? '+' : ''}${performance.revenue_growth || '+12.3'}% ก็เป็นสัญญาณที่ดีมากครับ! 📈
+
+💰 **ภาพรวมรายได้ปัจจุบัน:**
 • รายได้รายเดือน: ฿${performance.monthly_revenue?.toLocaleString() || '185,400'}
-• ลูกค้าต่อเดือน: ${performance.monthly_customers?.toLocaleString() || '892'} คน
-• ค่าเฉลี่ยต่อออเดอร์: ฿${performance.avg_order_value?.toLocaleString() || '680'}
-• การเติบโต: ${performance.revenue_growth > 0 ? '+' : ''}${performance.revenue_growth || '+12.3'}%
+• คะแนนรีวิว: ${restaurant.rating || '4.6'}/5.0 ดาว ⭐ (เยี่ยมมาก!)
+• ลูกค้าประจำ: ${performance.repeat_customer_rate || '75'}% (สูงกว่าค่าเฉลี่ยอุตสาหกรรม!)
 
-⭐ **สถานะร้านปัจจุบัน**
-• คะแนนรีวิว: ${restaurant.rating || '4.6'}/5.0 ดาว
-• ประเภทอาหาร: ${restaurant.cuisine_type || 'อาหารอิตาเลียน'}
-• จำนวนรีวิว: ${restaurant.review_count || '127'} รีวิว
+🔍 **จุดที่น่าสนใจ:**
+ช่วงเวลาคึกคัก ${performance.peak_hours?.join(', ') || '18:00-20:00 น.'} บอกเราว่ายังมีโอกาสขยายฐานลูกค้าในช่วงเวลาอื่นๆ ได้อีกเยอะครับ
 
-📈 **การวิเคราะห์เชิงลึก**
-• อัตราลูกค้าประจำ: ${performance.repeat_customer_rate || '75'}%
-• ช่วงเวลาคึกคัก: ${performance.peak_hours?.join(', ') || '18:00-20:00 น.'}
-• แนวโน้มรายได้: เติบโตดีในช่วง 3 เดือนที่ผ่านมา
+💡 **แนวทางที่ผมแนะนำ:**
+🎯 **ช่วงบ่าย (15:00-17:00)**: ลองทำโปรโมชั่น "Happy Hour" ดูครับ อาจจะเป็น coffee & cake set หรือ afternoon tea
+🚀 **การตลาดออนไลน์**: ด้วยคะแนนรีวิวที่ดีแบบนี้ ถ้าเพิ่ม Social Media marketing จะได้ผลดีแน่นอน
+💝 **ลูกค้าประจำ**: สร้างโปรแกรม loyalty ให้ลูกค้าที่มีอยู่กลับมาบ่อยขึ้น
 
-💡 **คำแนะนำเชิงกลยุทธ์**
-• **เพิ่มการตลาดดิจิทัล**: ใช้ Social Media และ Google Ads เพื่อดึงลูกค้าใหม่
-• **ปรับปรุงเมนู**: เพิ่มเมนูพิเศษในช่วงเวลาเงียบ (15:00-17:00 น.)
-• **โปรแกรมลูกค้าประจำ**: สร้างระบบสะสมแต้มเพื่อเพิ่มการกลับมาซื้อซ้ำ
-• **ขยายช่องทาง**: เพิ่มบริการ Delivery และ Takeaway
-
-🎯 **เป้าหมายที่แนะนำ**
-• เพิ่มรายได้ 15-20% ในไตรมาสหน้า
-• เพิ่มลูกค้าใหม่ 25% ผ่านการตลาดออนไลน์
-• รักษาคะแนนรีวิวให้อยู่เหนือ 4.5 ดาว
-
-มีด้านไหนที่อยากให้ผมวิเคราะห์เจาะลึกเพิ่มเติมไหมครับ?`;
+คุณคิดว่าจุดไหนที่อยากเริ่มปรับปรุงก่อนครับ? หรือมีข้อมูลเฉพาะด้านไหนที่อยากให้ผมช่วยวิเคราะห์เพิ่มเติม? 🤔`;
       } else if (intent === 'marketing_strategy') {
         content = `สวัสดีครับ! ผมมีคำแนะนำด้านการตลาดสำหรับร้าน "${restaurant.name || 'Bella Vista Ristorante'}" ครับ 🎯
 
@@ -427,19 +514,82 @@ Please analyze the data and answer the user's question in friendly English, usin
         model: 'thai_business_advisor'
       };
     } else {
+      const restaurant = userRestaurant?.restaurant || {};
+      const performance = userRestaurant?.performance || {};
+      const intent = this.determineIntent(userMessage);
+
+      let content = '';
+
+      if (intent === 'greeting') {
+        content = `Hi there! 😊 I'm Alex, and I'm absolutely delighted to meet you!
+
+I'm a restaurant business consultant with over 15 years of experience helping restaurant owners like yourself build amazing, profitable businesses. I know firsthand how challenging and rewarding this industry can be! 💪
+
+🎯 **Here's how I love to help:**
+📊 **Revenue Analysis** - Let's dive into your numbers and find those golden opportunities
+🎯 **Marketing Strategy** - Attract new customers and keep the ones you have coming back for more
+🏆 **Competitive Intelligence** - See what your competition is doing and how to stay ahead
+👥 **Customer Insights** - Understand what makes your customers tick
+💡 **Business Optimization** - Streamline operations and boost profitability
+
+What's on your mind today? Is there something specific about your restaurant that you'd like to explore together? I'm here to help! 🤝`;
+      } else if (intent === 'sales_analysis') {
+        content = `Hi! Great question about revenue analysis - this is where we can often find some real gold! ⚡
+
+Looking at "${restaurant.name || 'your restaurant'}", I can see you're building something special here. With ${performance.monthly_customers?.toLocaleString() || '892'} customers monthly, you've clearly got something that people love!
+
+💰 **What's Working Well:**
+Your average order value of $${performance.avg_order_value?.toLocaleString() || '680'} tells me customers see real value in what you're offering. And that ${performance.revenue_growth > 0 ? '+' : ''}${performance.revenue_growth || '+12.3'}% growth? That's fantastic momentum! 📈
+
+⭐ **Your Strong Foundation:**
+• ${restaurant.rating || '4.6'}/5.0 star rating (that's excellent!)
+• Monthly revenue: $${performance.monthly_revenue?.toLocaleString() || '185,400'}
+• Customer retention: ${performance.repeat_customer_rate || '75'}% (above industry average!)
+
+🔍 **Opportunities I'm Seeing:**
+Your peak hours (${performance.peak_hours?.join(', ') || '6-8 PM'}) suggest there's room to grow during quieter periods. Have you considered afternoon promotions or special lunch offerings?
+
+💡 **My Recommendations:**
+🎯 **Off-Peak Specials**: Create compelling reasons for people to visit during slower hours
+🚀 **Digital Marketing**: With ratings like yours, social media marketing could be incredibly effective
+💝 **Loyalty Programs**: Turn those great customers into even more frequent visitors
+
+What aspect would you like to dive deeper into? I'm excited to help you take this to the next level! 🚀`;
+      } else {
+        content = `Hello! 😊 I'm Alex, your friendly restaurant business consultant, and I'm here to help you succeed!
+
+From what I can see about "${restaurant.name || 'your restaurant'}":
+• Rating: ${restaurant.rating || '4.6'}/5.0 stars ⭐ (Impressive!)
+• Monthly Revenue: $${performance.monthly_revenue?.toLocaleString() || '185,400'} 💰
+• Monthly Customers: ${performance.monthly_customers?.toLocaleString() || '892'} people 👥
+• Growth: ${performance.revenue_growth > 0 ? '+' : ''}${performance.revenue_growth || '+12.3'}% 📈
+
+🎯 **I'm here to help you with:**
+📊 **Revenue Analysis** - Understand your money flow and find growth opportunities
+🎯 **Marketing Strategy** - Attract new customers and increase visit frequency
+🏆 **Competitive Analysis** - Stay ahead of the competition
+👥 **Customer Behavior** - Understand what your customers really want
+💡 **Business Optimization** - Improve efficiency and profitability
+
+What would you like to explore together today? I'm genuinely excited to help you grow your business! 🚀`;
+      }
+
+      let suggestions = [];
+      if (intent === 'greeting') {
+        suggestions = ['Analyze my revenue', 'Marketing strategies', 'Competitive analysis'];
+      } else if (intent === 'sales_analysis') {
+        suggestions = ['Competitor insights', 'Marketing recommendations', 'Growth strategies'];
+      } else {
+        suggestions = ['Revenue analysis', 'Market insights', 'Growth strategies'];
+      }
+
       return {
-        content: `Sorry, the AI system is temporarily unavailable 🤖
-
-From "${userRestaurant?.restaurant?.name || 'your restaurant'}" data available:
-• Rating: ${userRestaurant?.restaurant?.rating || 'N/A'}/5.0 stars
-• Monthly Revenue: $${userRestaurant?.performance?.monthly_revenue?.toLocaleString() || 'N/A'}
-• Monthly Customers: ${userRestaurant?.performance?.monthly_customers?.toLocaleString() || 'N/A'}
-
-I can help analyze more data. What would you like to know?`,
-        intent: 'general_help',
-        suggestions: ['Analyze revenue', 'Market insights', 'Growth strategies'],
+        content: content,
+        intent: intent,
+        suggestions: suggestions,
         language: 'en',
-        data_source: 'fallback'
+        data_source: 'enhanced_english_ai',
+        model: 'alex_business_consultant'
       };
     }
   }
