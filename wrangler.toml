@@ -1,14 +1,14 @@
 name = "bitebase-backend"
-main = "index.js"
-compatibility_date = "2024-07-01"
-node_compat = true
+main = "worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+account_id = "5adf62efd6cf179a8939c211b155e229"
 
 [env.production]
 name = "bitebase-backend-prod"
-route = "api.bitebase.app/*"
 
 # Environment variables (configure these in Cloudflare dashboard)
-[vars]
+[env.production.vars]
 NODE_ENV = "production"
 CORS_ORIGIN = "https://beta.bitebase.app"
 FRONTEND_URL = "https://beta.bitebase.app"
@@ -33,10 +33,6 @@ AWS_REGION = "us-east-1"
 # wrangler secret put JWT_SECRET
 # wrangler secret put AWS_ACCESS_KEY_ID
 # wrangler secret put AWS_SECRET_ACCESS_KEY
-
-[[env.production.services]]
-binding = "DB"
-service = "neon-postgres"
 
 [build]
 command = "npm run build"
