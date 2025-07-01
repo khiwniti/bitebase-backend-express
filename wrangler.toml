@@ -1,0 +1,42 @@
+name = "bitebase-backend"
+main = "index.js"
+compatibility_date = "2024-07-01"
+node_compat = true
+
+[env.production]
+name = "bitebase-backend-prod"
+route = "api.bitebase.app/*"
+
+# Environment variables (configure these in Cloudflare dashboard)
+[vars]
+NODE_ENV = "production"
+CORS_ORIGIN = "https://beta.bitebase.app"
+FRONTEND_URL = "https://beta.bitebase.app"
+API_ROUTE_PREFIX = "/api/v1"
+DEBUG = "false"
+ENABLE_CROSS_REGION_INFERENCE = "true"
+ENABLE_APPLICATION_INFERENCE_PROFILES = "true"
+BEDROCK_API_BASE_URL = "https://bedrock-proxy.bitebase.app/api/v1"
+BEDROCK_CHAT_MODEL = "anthropic.claude-3-sonnet-20240229-v1:0"
+BEDROCK_REASONING_MODEL = "anthropic.claude-3-7-sonnet-20241202-v1:0"
+BEDROCK_FAST_MODEL = "anthropic.claude-3-haiku-20240307-v1:0"
+BEDROCK_EMBEDDING_MODEL = "cohere.embed-multilingual-v3"
+AWS_REGION = "us-east-1"
+
+# Secrets (configure these via wrangler secret put)
+# wrangler secret put DATABASE_URL
+# wrangler secret put POSTGRES_URL
+# wrangler secret put REDIS_URL
+# wrangler secret put MAPBOX_API_KEY
+# wrangler secret put FOURSQUARE_API_KEY
+# wrangler secret put BEDROCK_API_KEY
+# wrangler secret put JWT_SECRET
+# wrangler secret put AWS_ACCESS_KEY_ID
+# wrangler secret put AWS_SECRET_ACCESS_KEY
+
+[[env.production.services]]
+binding = "DB"
+service = "neon-postgres"
+
+[build]
+command = "npm run build"

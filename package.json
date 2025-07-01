@@ -11,7 +11,10 @@
     "lint": "echo 'Backend validation complete'",
     "clean": "rm -rf dist node_modules/.cache",
     "dev-enhanced": "cross-env NODE_ENV=development PORT=12001 node enhanced-server.js",
-    "start-bedrock": "./start-bedrock-gateway.sh"
+    "start-bedrock": "./start-bedrock-gateway.sh",
+    "deploy:cloudflare": "wrangler deploy",
+    "cf:dev": "wrangler dev",
+    "cf:tail": "wrangler tail"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.675.0",
@@ -31,7 +34,8 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "wrangler": "^3.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
