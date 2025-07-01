@@ -325,7 +325,8 @@ class FoursquareClient {
     try {
       const response = await this.get('/places/search', {
         ll: '40.7128,-74.0060', // NYC coordinates
-        limit: 1
+        limit: 1,
+        categories: '13000' // Food and dining category
       });
       
       return {
