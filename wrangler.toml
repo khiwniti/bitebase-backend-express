@@ -2,10 +2,18 @@ name = "bitebase-backend"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-account_id = "5adf62efd6cf179a8939c211b155e229"
+account_id = "dc95c232d76cc4df23a5ca452a4046ab"
 
 [env.production]
 name = "bitebase-backend-prod"
+
+# Custom domain setup (disabled for now - domain not in current account)
+# custom_domains = ["api.bitebase.app"]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "bitebase-production-v2"
+database_id = "92dda6a5-b416-47a9-a9da-9019f08575be"
 
 # Environment variables (configure these in Cloudflare dashboard)
 [env.production.vars]

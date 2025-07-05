@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(npm run test-bedrock:*)",
+      "Bash(node:*)",
+      "Bash(timeout 10s npm run dev-enhanced)",
+      "Bash(timeout 5s npm run dev)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(find:*)",
+      "Bash(git -C ../beta-bitebase-app status --porcelain)",
+      "Bash(git -C ../beta-bitebase-app add .)",
+      "Bash(git -C ../beta-bitebase-app commit -m \"$(cat <<'EOF'\n✨ Update frontend for AWS Bedrock AI integration compatibility\n\n## 🔄 **Frontend Updates for Bedrock Integration:**\n- **Updated configuration** to work with new Bedrock AI backend endpoints\n- **Enhanced dashboard components** for improved AI analytics display  \n- **Updated API client** to handle new Bedrock response format\n- **Improved connection monitoring** for Bedrock gateway health checks\n- **Updated external API config** for AWS Bedrock integration\n\n## 📦 **Updated Components:**\n- `CustomerAnalyticsDashboard.tsx` - Enhanced for Bedrock AI analytics\n- `ForecastingDashboard.tsx` - Updated for new AI prediction format\n- `LocationIntelligenceDashboard.tsx` - Improved geospatial AI integration\n- `ProductionStatusDashboard.tsx` - Added Bedrock service monitoring\n- `RevenueAnalyticsDashboard.tsx` - Enhanced for AI-powered insights\n\n## 🔧 **Configuration Updates:**\n- `config.ts` - Added Bedrock API endpoints and settings\n- `connection-monitor.ts` - Added Bedrock gateway health monitoring\n- `enhanced-data-service.ts` - Updated for new AI service integration\n- `external-api-config.ts` - Added AWS Bedrock configuration\n- `package.json` - Updated dependencies for Bedrock compatibility\n\n## 🎯 **Compatibility Features:**\n- Seamless integration with new Bedrock AI backend\n- Enhanced error handling for AI service unavailability\n- Improved loading states for AI-powered features\n- Better user feedback for AI processing status\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git -C ../beta-bitebase-app log --oneline -2)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(curl:*)",
+      "Bash(./deploy-to-vercel.sh)",
+      "Bash(dos2unix:*)",
+      "Bash(sed:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vercel:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(PORT=3333 timeout 10s npm start)"
+    ],
+    "deny": []
+  }
+}
