@@ -251,10 +251,9 @@ export default {
         return new Response(null, {
           status: 200,
           headers: {
-            'Access-Control-Allow-Origin': '*', // Allow all origins for now
+            'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-            'Access-Control-Allow-Credentials': 'true',
           },
         });
       }
@@ -333,7 +332,7 @@ export default {
               status: 200,
               headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': env.CORS_ORIGIN || 'https://beta.bitebase.app',
+                'Access-Control-Allow-Origin': '*',
               },
             });
           } else {
@@ -346,7 +345,7 @@ export default {
               status: 401,
               headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': env.CORS_ORIGIN || 'https://beta.bitebase.app',
+                'Access-Control-Allow-Origin': '*',
               },
             });
           }
@@ -360,7 +359,7 @@ export default {
             status: 400,
             headers: {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': env.CORS_ORIGIN || 'https://beta.bitebase.app',
+              'Access-Control-Allow-Origin': '*',
             },
           });
         }
@@ -382,7 +381,7 @@ export default {
               status: 400,
               headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': env.CORS_ORIGIN || 'https://beta.bitebase.app',
+                'Access-Control-Allow-Origin': '*',
               },
             });
           }
@@ -414,7 +413,7 @@ export default {
             status: 200,
             headers: {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': env.CORS_ORIGIN || 'https://beta.bitebase.app',
+              'Access-Control-Allow-Origin': '*',
             },
           });
 
@@ -429,7 +428,7 @@ export default {
             status: 500,
             headers: {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': env.CORS_ORIGIN || 'https://beta.bitebase.app',
+              'Access-Control-Allow-Origin': '*',
             },
           });
         }
