@@ -1,18 +1,39 @@
 /**
  * Restaurant Discovery Service
- * Handles venue discovery, competitor analysis, and restaurant intelligence
+ * Handles venue discovery, competitor analysis, and restaurant intelligence.
+ * Can use either Foursquare or Google Places as a data source.
  */
+
+require('dotenv').config(); // To access LOCATION_DATA_SOURCE
 
 const { FoursquareClient } = require('./FoursquareClient');
 const { foursquareConfig } = require('../config/foursquare');
+const { GooglePlacesClient, GooglePlacesAPIStatus } = require('./GooglePlacesClient');
+const { googlePlacesConfig } = require('../config/googlePlaces');
+
+const LOCATION_SOURCE_FOURSQUARE = 'foursquare';
+const LOCATION_SOURCE_GOOGLE = 'google';
 
 class RestaurantDiscoveryService {
-  constructor(foursquareClient = null, database = null) {
-    this.foursquare = foursquareClient || new FoursquareClient();
+  constructor(database = null, locationSource = process.env.LOCATION_DATA_SOURCE || LOCATION_SOURCE_FOURSQUARE) {
     this.db = database; // Database pool will be injected
+    this.locationSource = locationSource;
+
+    if (this.locationSource === LOCATION_SOURCE_GOOGLE) {
+      this.locationClient = new GooglePlacesClient();
+      console.log('📍 RestaurantDiscoveryService initialized with Google Places API.');
+    } else if (this.locationSource === LOCATION_SOURCE_FOURSQUARE) {
+      this.locationClient = new FoursquareClient(); // Assumes FoursquareClient can be instantiated without args
+      console.log('📍 RestaurantDiscoveryService initialized with Foursquare API.');
+    } else {
+      console.warn(`⚠️ Unknown LOCATION_DATA_SOURCE: "${this.locationSource}". Defaulting to Foursquare.`);
+      this.locationClient = new FoursquareClient();
+      this.locationSource = LOCATION_SOURCE_FOURSQUARE;
+    }
     
-    // Category mappings for different restaurant types
-    this.categoryMap = {
+    // Category mappings for different restaurant types (primarily for Foursquare)
+    // Google Places uses type keywords like 'restaurant', 'cafe', etc.
+    this.foursquareCategoryMap = {
       'fast_food': ['13145', '13146'], // Quick Service, Fast Food
       'casual_dining': ['13065', '13066'], // Casual Dining, Family Restaurant  
       'fine_dining': ['13064'], // Fine Dining
@@ -30,17 +51,103 @@ class RestaurantDiscoveryService {
   }
 
   /**
-   * Find nearby restaurants using Foursquare API
+   * Transforms a Google Place object to the standard venue format.
+   * @param {object} place - Google Place object.
+   * @returns {object} Standardized venue object.
+   */
+  _transformGooglePlaceToStandardFormat(place) {
+    // Basic mapping, needs refinement based on actual data fields
+    return {
+      id: place.place_id, // Use place_id as the primary identifier
+      fsq_id: place.place_id, // For compatibility with DB schema expecting fsq_id
+      name: place.name,
+      location: {
+        latitude: place.geometry?.location?.lat,
+        longitude: place.geometry?.location?.lng,
+        address: place.vicinity || place.formatted_address, // Vicinity is often shorter, formatted_address more complete
+        formatted_address: place.formatted_address,
+        // Google doesn't break down address components as richly as Foursquare in Nearby Search.
+        // Place Details would be needed for locality, region, postcode, country.
+        // For now, these might be null or derived if possible.
+        locality: place.address_components?.find(c => c.types.includes('locality'))?.long_name || null,
+        region: place.address_components?.find(c => c.types.includes('administrative_area_level_1'))?.short_name || null,
+        postcode: place.address_components?.find(c => c.types.includes('postal_code'))?.long_name || null,
+        country: place.address_components?.find(c => c.types.includes('country'))?.short_name || null,
+      },
+      categories: place.types?.map(type => ({ name: type, id: type })) || [], // Google types are strings
+      chains: [], // Google API (Nearby/Details) doesn't directly provide chain info like Foursquare
+      distance: place.distance_meters || null, // If calculated and added externally, or from a Directions API call. Not directly in Place object.
+      popularity: place.user_ratings_total, // user_ratings_total can serve as a proxy for popularity
+      rating: place.rating,
+      price: place.price_level, // Typically 0-4
+      hours: place.opening_hours ? { open_now: place.opening_hours.open_now } : null, // Basic open_now status
+      website: place.website,
+      tel: place.formatted_phone_number,
+      email: null, // Not typically provided by Google Places API
+      social_media: null, // Not typically provided
+      verified: place.business_status === 'OPERATIONAL', // A guess, Google doesn't have a direct 'verified' like Foursquare
+      stats: {
+          user_ratings_total: place.user_ratings_total,
+          // Other stats might require different API calls or aren't available
+      },
+      source: LOCATION_SOURCE_GOOGLE // Add source for clarity
+    };
+  }
+
+  /**
+   * Transforms a Foursquare venue object to the standard venue format.
+   * This is the original transformVenueData method.
+   * @param {object} venue - Foursquare venue object.
+   * @returns {object} Standardized venue object.
+   */
+  _transformFoursquareVenueToStandardFormat(venue) {
+    return {
+      id: venue.fsq_id,
+      fsq_id: venue.fsq_id,
+      name: venue.name,
+      location: {
+        latitude: venue.location?.latitude || venue.geocodes?.main?.latitude,
+        longitude: venue.location?.longitude || venue.geocodes?.main?.longitude,
+        address: venue.location?.formatted_address || venue.location?.address,
+        formatted_address: venue.location?.formatted_address,
+        locality: venue.location?.locality,
+        region: venue.location?.region,
+        postcode: venue.location?.postcode,
+        country: venue.location?.country
+      },
+      categories: venue.categories || [],
+      chains: venue.chains || [],
+      distance: venue.distance,
+      popularity: venue.popularity,
+      rating: venue.rating,
+      price: venue.price,
+      hours: venue.hours,
+      website: venue.website,
+      tel: venue.tel,
+      email: venue.email,
+      social_media: venue.social_media,
+      verified: venue.verified || false,
+      stats: venue.stats || {},
+      source: LOCATION_SOURCE_FOURSQUARE
+    };
+  }
+
+
+  /**
+   * Find nearby restaurants using the configured location client.
    */
   async findNearbyRestaurants(searchParams) {
     const {
-      location,
+      location, // {lat, lng}
       radius = 1000,
-      categories = this.categoryMap.all_dining,
-      limit = 50,
-      sort = 'popularity',
-      chains = null,
-      priceRange = null
+      // 'categories' for Foursquare (IDs), 'type' or 'keyword' for Google
+      categories, // Foursquare category IDs
+      type,       // Google Place type (e.g., 'restaurant')
+      keyword,    // Google keyword search
+      limit = 20, // Google Nearby Search default is 20, max is 60 with pagination. Foursquare default 10, max 50.
+      sort = 'popularity', // Foursquare specific. Google has 'prominence' (default) or 'distance' (req. keyword/type)
+      chains = null, // Foursquare specific
+      priceRange = null // Foursquare specific for filtering, Google has price_level output
     } = searchParams;
 
     if (!location || !location.lat || !location.lng) {
@@ -48,42 +155,72 @@ class RestaurantDiscoveryService {
     }
 
     try {
-      // Use the Foursquare client's searchVenues method
-      const venues = await this.foursquare.searchVenues({
-        location,
-        radius,
-        categories: Array.isArray(categories) ? categories : [categories],
-        limit,
-        sort
-      });
+      let rawVenues = [];
+      let transformedVenues = [];
 
-      // Filter and enhance the results
-      let filteredVenues = venues;
+      if (this.locationSource === LOCATION_SOURCE_GOOGLE) {
+        // Google Specific parameters
+        const googleRadius = radius;
+        const googleType = type || 'restaurant'; // Default to restaurant if not specified
+        const googleKeyword = keyword; // Can be cuisine, name, etc.
+        // Google's Nearby Search doesn't have a direct 'limit' like Foursquare in a single call (max 20 per page)
+        // and sort is 'prominence' or 'distance'.
 
-      // Apply chain filter if specified
-      if (chains && chains.length > 0) {
-        filteredVenues = venues.filter(venue => 
-          venue.chains && venue.chains.some(chain => 
-            chains.includes(chain.name.toLowerCase())
-          )
+        const response = await this.locationClient.searchNearbyRestaurants(
+          location.lat,
+          location.lng,
+          googleRadius,
+          googleKeyword,
+          googleType
         );
+        rawVenues = response.results || []; // Google API returns results in 'results' array
+        transformedVenues = rawVenues.map(place => this._transformGooglePlaceToStandardFormat(place));
+
+      } else { // Foursquare (default)
+        const fsqCategories = categories || this.foursquareCategoryMap.all_dining;
+        const fsqLimit = Math.min(limit, 50);
+        const fsqSort = sort;
+
+        rawVenues = await this.locationClient.searchVenues({
+          location,
+          radius,
+          categories: Array.isArray(fsqCategories) ? fsqCategories : [fsqCategories],
+          limit: fsqLimit,
+          sort: fsqSort
+        });
+        transformedVenues = rawVenues.map(venue => this._transformFoursquareVenueToStandardFormat(venue));
       }
 
-      // Apply price range filter if specified
-      if (priceRange && priceRange.length === 2) {
-        filteredVenues = filteredVenues.filter(venue => 
-          venue.price >= priceRange[0] && venue.price <= priceRange[1]
-        );
+      // Common post-processing (filtering if applicable, though some filters are source-specific)
+      // Foursquare-specific filters (chains, priceRange) might not apply well to Google results here
+      // without fetching more details or having different logic.
+      // For now, these filters will effectively only apply if the source is Foursquare.
+      let filteredVenues = transformedVenues;
+      if (this.locationSource === LOCATION_SOURCE_FOURSQUARE) {
+        if (chains && chains.length > 0) {
+          filteredVenues = filteredVenues.filter(venue =>
+            venue.chains && venue.chains.some(chainInfo =>
+              chains.includes(chainInfo.name?.toLowerCase())
+            )
+          );
+        }
+        if (priceRange && priceRange.length === 2) {
+           filteredVenues = filteredVenues.filter(venue =>
+            venue.price >= priceRange[0] && venue.price <= priceRange[1]
+          );
+        }
       }
 
-      // Store venues in database for future reference
+      // Store venues in database (consider source for ID conflicts)
       if (this.db && filteredVenues.length > 0) {
+        // The ID used for storage will be venue.id, which is mapped from fsq_id or place_id
         await this.storeVenuesInDatabase(filteredVenues);
       }
 
-      return filteredVenues.map(venue => this.transformVenueData(venue));
+      return filteredVenues.slice(0, limit); // Apply limit after transformation & filtering
+
     } catch (error) {
-      console.error('❌ Error finding nearby restaurants:', error);
+      console.error(`❌ Error finding nearby restaurants (source: ${this.locationSource}):`, error.message);
       throw new Error(`Failed to find nearby restaurants: ${error.message}`);
     }
   }
@@ -97,29 +234,41 @@ class RestaurantDiscoveryService {
     }
 
     try {
-      console.log(`🔍 Starting competitor analysis for location: ${restaurantLocation.lat}, ${restaurantLocation.lng}`);
+      console.log(`🔍 Starting competitor analysis for location: ${restaurantLocation.lat}, ${restaurantLocation.lng} (source: ${this.locationSource})`);
 
       // Find all restaurants in the area
-      const competitors = await this.findNearbyRestaurants({
+      // For Google, we might need to adjust parameters for findNearbyRestaurants,
+      // e.g., using 'keyword' or specific 'type' if 'categories' logic differs.
+      const searchParams = {
         location: restaurantLocation,
         radius,
-        limit: 50,
-        sort: 'popularity'
-      });
+        limit: 50, // This limit is applied post-fetch in findNearbyRestaurants
+      };
+      if (this.locationSource === LOCATION_SOURCE_GOOGLE) {
+        searchParams.type = 'restaurant'; // Generic type for restaurants
+        // Google's 'sort' is prominence or distance, not popularity directly.
+        // The current findNearbyRestaurants doesn't pass sort to Google.
+      } else {
+        searchParams.categories = this.foursquareCategoryMap.all_dining;
+        searchParams.sort = 'popularity';
+      }
+      const competitors = await this.findNearbyRestaurants(searchParams);
 
       // Get detailed information for top competitors
       const detailedCompetitors = await Promise.all(
-        competitors.slice(0, 20).map(async (venue) => {
+        competitors.slice(0, 20).map(async (venue) => { // venue.id is the unified ID
           try {
-            const details = await this.getVenueDetails(venue.fsq_id);
-            const visitStats = await this.getVenueVisitStats(venue.fsq_id);
+            // venue.id is already the correct ID (fsq_id or place_id)
+            const details = await this.getVenueDetails(venue.id);
+            // getVenueVisitStats is Foursquare specific.
+            const visitStats = await this.getVenueVisitStats(venue.id);
             return { 
               ...venue, 
-              details: details || {}, 
+              details: details || {}, // details from getVenueDetails is already standardized
               visitStats: visitStats || {} 
             };
           } catch (error) {
-            console.warn(`⚠️ Failed to get details for venue ${venue.fsq_id}:`, error.message);
+            console.warn(`⚠️ Failed to get details/stats for venue ${venue.id} (source: ${this.locationSource}):`, error.message);
             return venue; // Return basic venue data if detailed lookup fails
           }
         })
@@ -130,36 +279,60 @@ class RestaurantDiscoveryService {
 
       // Store analysis in database
       if (this.db) {
+        // This part might need adjustment if analysis structure depends on source
         await this.storeCompetitorAnalysis(restaurantLocation, analysis);
       }
 
       return analysis;
     } catch (error) {
-      console.error('❌ Error in competitor analysis:', error);
+      console.error(`❌ Error in competitor analysis (source: ${this.locationSource}):`, error.message);
       throw new Error(`Failed to analyze competitors: ${error.message}`);
     }
   }
 
   /**
-   * Get detailed venue information
+   * Get detailed venue information using the configured location client.
+   * @param {string} venueId - The ID of the venue (fsq_id for Foursquare, place_id for Google).
+   * @returns {Promise<object|null>} Standardized venue object or null if not found/error.
    */
   async getVenueDetails(venueId) {
+    if (!venueId) {
+      console.warn('⚠️ Venue ID is required for getVenueDetails.');
+      return null;
+    }
     try {
-      return await this.foursquare.getVenueDetails(venueId);
+      let details;
+      if (this.locationSource === LOCATION_SOURCE_GOOGLE) {
+        const response = await this.locationClient.getPlaceDetails(venueId); // Fetches from Google
+        // Google's getPlaceDetails returns { result: Place, ... }
+        details = response.result ? this._transformGooglePlaceToStandardFormat(response.result) : null;
+      } else {
+        const rawDetails = await this.locationClient.getVenueDetails(venueId); // Fetches from Foursquare
+        details = rawDetails ? this._transformFoursquareVenueToStandardFormat(rawDetails) : null;
+      }
+      return details;
     } catch (error) {
-      console.warn(`⚠️ Failed to get venue details for ${venueId}:`, error.message);
+      console.warn(`⚠️ Failed to get venue details for ${venueId} (source: ${this.locationSource}):`, error.message);
       return null;
     }
   }
 
   /**
-   * Get venue visit statistics (requires premium API)
+   * Get venue visit statistics. Currently Foursquare-specific.
+   * @param {string} venueId - The Foursquare venue ID.
+   * @returns {Promise<object|null>} Venue statistics object or null.
    */
   async getVenueVisitStats(venueId) {
+    if (this.locationSource === LOCATION_SOURCE_GOOGLE) {
+      console.warn(`⚠️ Venue visit stats are not available for Google Places source for venue ${venueId}.`);
+      return null; // Google Places API doesn't offer direct Foursquare-like stats.
+    }
+    // Assuming Foursquare source if not Google
     try {
-      return await this.foursquare.getVenueStats(venueId);
+      // This method is specific to FoursquareClient
+      return await this.locationClient.getVenueStats(venueId);
     } catch (error) {
-      console.warn(`⚠️ Failed to get venue stats for ${venueId}:`, error.message);
+      console.warn(`⚠️ Failed to get venue stats for ${venueId} (source: ${this.locationSource}):`, error.message);
       return null;
     }
   }
@@ -592,6 +765,36 @@ class RestaurantDiscoveryService {
     }
     
     return weaknesses;
+  }
+
+  /**
+   * Perform a health check on the currently active location client.
+   * @returns {Promise<object>} Health status object from the active client.
+   */
+  async healthCheck() {
+    if (this.locationClient && typeof this.locationClient.healthCheck === 'function') {
+      try {
+        const health = await this.locationClient.healthCheck();
+        return {
+          ...health, // Spread the original health check result
+          client_source: this.locationSource // Add which client was checked
+        };
+      } catch (error) {
+        console.error(`❌ Health check failed for ${this.locationSource} client:`, error.message);
+        return {
+          status: 'unhealthy',
+          client_source: this.locationSource,
+          error: error.message,
+        };
+      }
+    } else {
+      console.warn(`⚠️ Health check not available for the current location client: ${this.locationSource}`);
+      return {
+        status: 'unknown',
+        client_source: this.locationSource,
+        message: 'Health check method not implemented on the client.',
+      };
+    }
   }
 }
 
