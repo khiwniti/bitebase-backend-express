@@ -13,11 +13,13 @@ class LocationIntelligenceService {
     // Initialize cache service
     this.cache = new FoursquareCacheService();
     
-    // Initialize Foursquare client
+    // Initialize Foursquare client (still needed for Foursquare-specific services like events, traffic)
     this.foursquareClient = new FoursquareClient();
     
-    // Initialize services with caching integration
-    this.restaurantDiscovery = new RestaurantDiscoveryService(this.foursquareClient, database);
+    // Initialize services
+    // RestaurantDiscoveryService now manages its own client (FSQ or Google) based on ENV var
+    this.restaurantDiscovery = new RestaurantDiscoveryService(database);
+    // FootTrafficAnalytics currently remains Foursquare-specific
     this.trafficAnalytics = new FootTrafficAnalytics(this.foursquareClient, database);
     
     this.db = database;
@@ -41,14 +43,29 @@ class LocationIntelligenceService {
         console.warn('⚠️ Cache service unavailable - continuing without cache');
       }
 
-      // Test Foursquare API connection
-      const healthCheck = await this.foursquareClient.healthCheck();
-      if (healthCheck.status === 'healthy') {
-        console.log('✅ Foursquare API connection verified');
+      // Test Restaurant Discovery Service's active data source connection
+      const discoveryHealthCheck = await this.restaurantDiscovery.healthCheck();
+      if (discoveryHealthCheck.status === 'healthy') {
+        console.log(`✅ Restaurant Discovery's data source (${discoveryHealthCheck.client_source || 'unknown'}) connection verified`);
       } else {
-        console.warn('⚠️ Foursquare API health check failed:', healthCheck.error);
-        throw new Error('Foursquare API not accessible');
+        const clientSource = discoveryHealthCheck.client_source || 'configured discovery client';
+        console.warn(`⚠️ Restaurant Discovery's data source (${clientSource}) health check failed:`, discoveryHealthCheck.error || discoveryHealthCheck.reason);
+        throw new Error(`Primary data source (${clientSource}) for restaurant discovery is not accessible.`);
       }
+
+      // Additionally, if Foursquare is used by other parts (like trafficAnalytics, getLocalEvents), check its health.
+      // This is somewhat redundant if discovery service is also using Foursquare, but good for clarity if they diverge.
+      if (this.trafficAnalytics || true) { // Assuming trafficAnalytics always needs Foursquare for now
+          const foursquareSpecificHealth = await this.foursquareClient.healthCheck();
+          if (foursquareSpecificHealth.status === 'healthy') {
+              console.log('✅ Foursquare API connection verified (for auxiliary services like traffic/events).');
+          } else {
+              console.warn('⚠️ Foursquare API (for auxiliary services) health check failed:', foursquareSpecificHealth.error);
+              // Depending on criticality, we might throw an error or just log a warning.
+              // For now, let's consider it a warning as discovery might use Google.
+          }
+      }
+
 
       // Set database reference for services
       if (this.db) {
@@ -531,9 +548,18 @@ class LocationIntelligenceService {
     };
 
     try {
-      // Check Foursquare API
-      const foursquareHealth = await this.foursquareClient.healthCheck();
-      status.components.foursquare_api = foursquareHealth;
+      // Check Restaurant Discovery Service's active client
+      const discoveryClientHealth = await this.restaurantDiscovery.healthCheck();
+      const discoveryClientKey = `discovery_client_${discoveryClientHealth.client_source || 'unknown'}`;
+      status.components[discoveryClientKey] = discoveryClientHealth;
+
+      // Check Foursquare API (if used for other services like traffic/events)
+      // We can label this more clearly if it's distinct from the discovery client
+      const foursquareAuxHealth = await this.foursquareClient.healthCheck();
+      status.components.foursquare_aux_services_api = {
+        ...foursquareAuxHealth,
+        purpose: "Used for traffic analytics and local events"
+      };
 
       // Check cache
       const cacheStats = await this.cache.getCacheStats();
