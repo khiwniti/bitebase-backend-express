@@ -116,3 +116,4 @@ Thumbs.db
 bedrock-access-gateway/
 # Credentials (never commit these)
 GOOGLE_OAUTH_CREDENTIALS.md
+ADMIN_CREDENTIALS.md

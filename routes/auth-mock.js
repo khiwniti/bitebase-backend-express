@@ -13,7 +13,7 @@ const {
 const users = new Map();
 const refreshTokens = new Map();
 
-// Mock user for testing
+// Mock users for testing
 const mockUser = {
   id: 1,
   email: 'demo@bitebase.com',
@@ -27,10 +27,26 @@ const mockUser = {
   created_at: new Date().toISOString()
 };
 
-// Initialize mock user with hashed password
+const adminUser = {
+  id: 2,
+  email: 'admin@bitebase.app',
+  password_hash: null, // Will be set on initialization
+  first_name: 'Admin',
+  last_name: 'User',
+  role: 'admin',
+  subscription_tier: 'enterprise',
+  subscription_status: 'active',
+  email_verified: true,
+  created_at: new Date().toISOString()
+};
+
+// Initialize mock users with hashed passwords
 (async () => {
   mockUser.password_hash = await hashPassword('demo123');
   users.set(mockUser.email, mockUser);
+  
+  adminUser.password_hash = await hashPassword('Libralytics1234!*');
+  users.set(adminUser.email, adminUser);
 })();
 
 /**
@@ -59,9 +75,10 @@ router.post('/register', async (req, res) => {
     // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Create user
+    // Create user with proper ID
+    const maxId = Math.max(...Array.from(users.values()).map(u => u.id), 0);
     const newUser = {
-      id: users.size + 1,
+      id: maxId + 1,
       email,
       password_hash: passwordHash,
       first_name: first_name || '',
