@@ -1,0 +1,19 @@
+{
+  "name": "bitebase-backend",
+  "version": "2.0.0",
+  "description": "BiteBase Backend - Cloudflare Workers Edition",
+  "main": "src/worker-simple.js",
+  "scripts": {
+    "build": "echo 'BiteBase Backend - Cloudflare Workers Ready'",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20250712.0",
+    "wrangler": "^4.24.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

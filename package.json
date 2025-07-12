@@ -16,7 +16,7 @@
     "deploy": "wrangler deploy",
     "dev:cf": "wrangler dev",
     "tail": "wrangler tail",
-    "build:cf": "esbuild src/worker.js --bundle --format=esm --outfile=dist/worker.js",
+    "build:cf": "esbuild src/worker-simple.js --bundle --format=esm --outfile=dist/worker.js",
     "deploy:production": "wrangler deploy --env production",
     "deploy:staging": "wrangler deploy --env staging"
   },
