@@ -14,6 +14,9 @@ const BedrockAI = require("./bedrock-ai");
 // Import MCP integration
 const { createMCPMiddleware } = require("./mcp");
 
+// Import auth routes
+const authRoutes = require('./routes/auth');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -559,6 +562,9 @@ app.use((req, res, next) => {
 
 // Import routes
 const analyticsRouter = require('./routes/analytics');
+
+// Mount auth routes
+app.use('/api/auth', authRoutes);
 
 // Mount location intelligence routes
 app.use('/api/location', locationRouter);
