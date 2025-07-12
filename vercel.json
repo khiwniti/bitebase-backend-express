@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "name": "bitebase-intelligence-backend",
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3001",
+    "MAPBOX_API_KEY": "@mapbox_api_key",
+    "STRIPE_SECRET_KEY": "@stripe_secret_key",
+    "GOOGLE_PLACES_API_KEY": "@google_places_api_key",
+    "FOURSQUARE_CLIENT_ID": "@foursquare_client_id",
+    "FOURSQUARE_CLIENT_SECRET": "@foursquare_client_secret",
+    "FOURSQUARE_API_KEY": "@foursquare_api_key",
+    "DATABASE_URL": "@database_url",
+    "POSTGRES_URL": "@postgres_url",
+    "PGHOST": "@pghost",
+    "PGUSER": "@pguser",
+    "PGDATABASE": "@pgdatabase",
+    "PGPASSWORD": "@pgpassword",
+    "JWT_SECRET": "@jwt_secret",
+    "CORS_ORIGIN": "https://beta.bitebase.app",
+    "BEDROCK_API_BASE_URL": "https://bedrock-proxy.bitebase.app/api/v1",
+    "BEDROCK_API_KEY": "@bedrock_api_key",
+    "BEDROCK_CHAT_MODEL": "anthropic.claude-3-sonnet-20240229-v1:0",
+    "BEDROCK_REASONING_MODEL": "anthropic.claude-3-7-sonnet-20241202-v1:0",
+    "BEDROCK_FAST_MODEL": "anthropic.claude-3-haiku-20240307-v1:0",
+    "BEDROCK_EMBEDDING_MODEL": "cohere.embed-multilingual-v3",
+    "AWS_REGION": "us-east-1",
+    "AWS_ACCESS_KEY_ID": "@aws_access_key_id",
+    "AWS_SECRET_ACCESS_KEY": "@aws_secret_access_key",
+    "API_ROUTE_PREFIX": "/api/v1",
+    "DEBUG": "false",
+    "ENABLE_CROSS_REGION_INFERENCE": "true",
+    "ENABLE_APPLICATION_INFERENCE_PROFILES": "true",
+    "FRONTEND_URL": "https://beta.bitebase.app"
+  },
+  "functions": {
+    "index.js": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://beta.bitebase.app"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, X-Requested-With"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+  "regions": ["sin1", "hkg1", "bom1"]
+}
