@@ -12,16 +12,9 @@
     "clean": "rm -rf dist node_modules/.cache",
     "dev-enhanced": "cross-env NODE_ENV=development PORT=12001 node enhanced-server.js",
     "start-bedrock": "./start-bedrock-gateway.sh",
-    "test": "mocha test/**/*.test.js || node test/run-tests.js",
-    "deploy": "wrangler deploy",
-    "dev:cf": "wrangler dev",
-    "tail": "wrangler tail",
-    "build:cf": "esbuild src/worker-simple.js --bundle --format=esm --outfile=dist/worker.js",
-    "deploy:production": "wrangler deploy --env production",
-    "deploy:staging": "wrangler deploy --env staging"
+    "test": "mocha test/**/*.test.js || node test/run-tests.js"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20250712.0",
     "@googlemaps/google-maps-services-js": "^3.4.0",
     "@mapbox/mapbox-sdk": "^0.16.1",
     "@modelcontextprotocol/sdk": "^0.5.0",
@@ -32,12 +25,10 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.4.1",
     "google-auth-library": "^10.1.0",
-    "hono": "^4.8.4",
     "jsonwebtoken": "^9.0.2",
     "openai": "^5.8.2",
     "pg": "^8.16.3",
-    "redis": "^4.7.0",
-    "wrangler": "^4.24.3"
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3"
