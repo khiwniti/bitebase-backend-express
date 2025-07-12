@@ -114,3 +114,5 @@ Thumbs.db
 
 # Bedrock Access Gateway (external repository)
 bedrock-access-gateway/
+# Credentials (never commit these)
+GOOGLE_OAUTH_CREDENTIALS.md

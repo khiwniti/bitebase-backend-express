@@ -14,8 +14,8 @@ const BedrockAI = require("./bedrock-ai");
 // Import MCP integration
 const { createMCPMiddleware } = require("./mcp");
 
-// Import auth routes
-const authRoutes = require('./routes/auth');
+// Import auth routes - use mock if no database
+const authRoutes = process.env.DATABASE_URL ? require('./routes/auth') : require('./routes/auth-mock');
 
 const app = express();
 const PORT = process.env.PORT || 3001;

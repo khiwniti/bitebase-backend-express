@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BiteBase Auth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success {
+            border-left: 4px solid #28a745;
+        }
+        .error {
+            border-left: 4px solid #dc3545;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 BiteBase Authentication Test</h1>
+        
+        <div class="test-section">
+            <h3>1. Login Test</h3>
+            <input type="email" id="loginEmail" placeholder="Email" value="demo@bitebase.com">
+            <input type="password" id="loginPassword" placeholder="Password" value="demo123">
+            <button onclick="testLogin()">Test Login</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Register Test</h3>
+            <input type="email" id="registerEmail" placeholder="Email" value="newuser@bitebase.com">
+            <input type="password" id="registerPassword" placeholder="Password" value="password123">
+            <button onclick="testRegister()">Test Register</button>
+            <div id="registerResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Get Current User</h3>
+            <button onclick="testGetUser()">Get User Info</button>
+            <div id="userResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Refresh Token</h3>
+            <button onclick="testRefreshToken()">Refresh Token</button>
+            <div id="refreshResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Logout</h3>
+            <button onclick="testLogout()">Test Logout</button>
+            <div id="logoutResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Current Auth State</h3>
+            <div id="authState" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001/api/auth';
+        let authToken = localStorage.getItem('authToken');
+        let refreshToken = localStorage.getItem('refreshToken');
+
+        function updateAuthState() {
+            document.getElementById('authState').innerHTML = JSON.stringify({
+                hasToken: !!authToken,
+                hasRefreshToken: !!refreshToken,
+                token: authToken ? authToken.substring(0, 20) + '...' : null
+            }, null, 2);
+        }
+
+        async function makeRequest(endpoint, method = 'GET', body = null, useAuth = false) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (useAuth && authToken) {
+                options.headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await response.json();
+                return { success: response.ok, data, status: response.status };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            const result = await makeRequest('/login', 'POST', { email, password });
+            
+            if (result.success && result.data.success) {
+                authToken = result.data.data.token;
+                refreshToken = result.data.data.refresh_token;
+                localStorage.setItem('authToken', authToken);
+                localStorage.setItem('refreshToken', refreshToken);
+            }
+            
+            document.getElementById('loginResult').className = `result ${result.success ? 'success' : 'error'}`;
+            document.getElementById('loginResult').innerHTML = JSON.stringify(result, null, 2);
+            updateAuthState();
+        }
+
+        async function testRegister() {
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            
+            const result = await makeRequest('/register', 'POST', {
+                email,
+                password,
+                first_name: 'Test',
+                last_name: 'User'
+            });
+            
+            if (result.success && result.data.success) {
+                authToken = result.data.data.token;
+                refreshToken = result.data.data.refresh_token;
+                localStorage.setItem('authToken', authToken);
+                localStorage.setItem('refreshToken', refreshToken);
+            }
+            
+            document.getElementById('registerResult').className = `result ${result.success ? 'success' : 'error'}`;
+            document.getElementById('registerResult').innerHTML = JSON.stringify(result, null, 2);
+            updateAuthState();
+        }
+
+        async function testGetUser() {
+            const result = await makeRequest('/me', 'GET', null, true);
+            document.getElementById('userResult').className = `result ${result.success ? 'success' : 'error'}`;
+            document.getElementById('userResult').innerHTML = JSON.stringify(result, null, 2);
+        }
+
+        async function testRefreshToken() {
+            const result = await makeRequest('/refresh', 'POST', { refresh_token: refreshToken });
+            
+            if (result.success && result.data.success) {
+                authToken = result.data.data.token;
+                refreshToken = result.data.data.refresh_token;
+                localStorage.setItem('authToken', authToken);
+                localStorage.setItem('refreshToken', refreshToken);
+            }
+            
+            document.getElementById('refreshResult').className = `result ${result.success ? 'success' : 'error'}`;
+            document.getElementById('refreshResult').innerHTML = JSON.stringify(result, null, 2);
+            updateAuthState();
+        }
+
+        async function testLogout() {
+            const result = await makeRequest('/logout', 'POST', null, true);
+            
+            if (result.success) {
+                authToken = null;
+                refreshToken = null;
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('refreshToken');
+            }
+            
+            document.getElementById('logoutResult').className = `result ${result.success ? 'success' : 'error'}`;
+            document.getElementById('logoutResult').innerHTML = JSON.stringify(result, null, 2);
+            updateAuthState();
+        }
+
+        // Initialize
+        updateAuthState();
+    </script>
+</body>
+</html>
