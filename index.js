@@ -84,7 +84,9 @@ const getAllowedOrigins = () => {
       "http://localhost:12000",
       "http://localhost:12001", 
       "http://localhost:3000",
-      "http://localhost:3001"
+      "http://localhost:3001",
+      "http://localhost:50129",
+      "http://localhost:56338"
     );
   }
   
@@ -451,105 +453,7 @@ app.get("/api/restaurants/:id/analytics", async (req, res) => {
   }
 });
 
-// Production-ready restaurant search endpoint
-app.post("/api/restaurants/search", async (req, res) => {
-  try {
-    const { 
-      location, 
-      cuisine_types = [], 
-      price_range = [1, 4], 
-      rating_min = 0, 
-      radius_km = 10,
-      limit = 20,
-      offset = 0 
-    } = req.body;
-
-    if (!location || !location.latitude || !location.longitude) {
-      return sendError(res, "Location coordinates are required", 400);
-    }
-
-    let searchQuery = `
-      SELECT 
-        r.*,
-        ST_Distance(
-          ST_GeogFromText('POINT(' || $1 || ' ' || $2 || ')'),
-          r.location::geography
-        ) / 1000 as distance_km
-      FROM restaurants r
-      WHERE ST_DWithin(
-        r.location::geography,
-        ST_GeogFromText('POINT(' || $1 || ' ' || $2 || ')'),
-        $3 * 1000
-      )
-    `;
-
-    const params = [location.longitude, location.latitude, radius_km];
-    let paramIndex = 4;
-
-    // Add cuisine filter
-    if (cuisine_types.length > 0) {
-      searchQuery += ` AND r.cuisine_types && $${paramIndex}`;
-      params.push(cuisine_types);
-      paramIndex++;
-    }
-
-    // Add price range filter
-    if (price_range.length === 2) {
-      searchQuery += ` AND r.price_range BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
-      params.push(price_range[0], price_range[1]);
-      paramIndex += 2;
-    }
-
-    // Add rating filter
-    if (rating_min > 0) {
-      searchQuery += ` AND r.rating >= $${paramIndex}`;
-      params.push(rating_min);
-      paramIndex++;
-    }
-
-    searchQuery += `
-      ORDER BY distance_km ASC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-    params.push(limit, offset);
-
-    const result = await pool.query(searchQuery, params);
-
-    const restaurants = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      cuisine_types: row.cuisine_types || [],
-      price_range: row.price_range,
-      rating: row.rating,
-      location: {
-        latitude: row.location ? parseFloat(row.location.split('(')[1].split(' ')[1]) : null,
-        longitude: row.location ? parseFloat(row.location.split('(')[1].split(' ')[0]) : null
-      },
-      distance_km: parseFloat(row.distance_km),
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    }));
-
-    sendResponse(res, {
-      restaurants,
-      search_params: {
-        location,
-        cuisine_types,
-        price_range,
-        rating_min,
-        radius_km,
-        limit,
-        offset
-      },
-      total_found: restaurants.length,
-      generated_at: new Date().toISOString()
-    }, "Restaurant search completed successfully");
-
-  } catch (error) {
-    console.error("❌ Restaurant search failed:", error);
-    sendError(res, "Failed to search restaurants", 500, error.message);
-  }
-});
+// Restaurant routes are now handled by the separate restaurant routes file
 
 // Location Intelligence Routes
 const { router: locationRouter, initializeLocationService } = require('./routes/location');
@@ -563,6 +467,7 @@ app.use((req, res, next) => {
 // Import routes
 const analyticsRouter = require('./routes/analytics');
 const adminRoutes = require('./routes/admin');
+const restaurantRoutes = require('./routes/restaurants');
 
 // Mount auth routes
 app.use('/api/auth', authRoutes);
@@ -578,6 +483,9 @@ app.use('/api/mcp', createMCPMiddleware());
 
 // Mount analytics routes
 app.use('/api/analytics', analyticsRouter);
+
+// Mount restaurant routes
+app.use('/api/restaurants', restaurantRoutes);
 
 // Initialize location service on startup
 (async () => {
