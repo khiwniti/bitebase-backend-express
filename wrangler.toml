@@ -1,10 +1,10 @@
-name = "bitebase-backend"
-main = "src/worker.js"
-compatibility_date = "2024-01-01"
+name = "bitebase-backend-prod"
+main = "src/worker-simple.js"
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 [env.production]
-name = "bitebase-backend-production"
+name = "bitebase-backend-prod"
 route = "https://api.bitebase.com/*"
 
 [env.staging]
