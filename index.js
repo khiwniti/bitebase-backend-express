@@ -562,9 +562,13 @@ app.use((req, res, next) => {
 
 // Import routes
 const analyticsRouter = require('./routes/analytics');
+const adminRoutes = require('./routes/admin');
 
 // Mount auth routes
 app.use('/api/auth', authRoutes);
+
+// Mount admin routes
+app.use('/api/admin', adminRoutes);
 
 // Mount location intelligence routes
 app.use('/api/location', locationRouter);
