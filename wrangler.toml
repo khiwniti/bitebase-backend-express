@@ -5,37 +5,37 @@ compatibility_flags = ["nodejs_compat"]
 
 [build]
 command = ""
-watch_paths = ["src/worker.js"]
 
 [env.production]
 name = "bitebase-backend-prod"
-route = "https://api.bitebase.com/*"
 
 [env.staging]
 name = "bitebase-backend-staging"
-route = "https://api-staging.bitebase.com/*"
-
-# KV Namespaces for caching
-[[kv_namespaces]]
-binding = "CACHE"
-id = "your-kv-namespace-id"
-preview_id = "your-kv-preview-id"
-
-# D1 Database (Cloudflare's SQLite)
-[[d1_databases]]
-binding = "DB"
-database_name = "bitebase-db"
-database_id = "your-d1-database-id"
-
-# R2 Storage for files
-[[r2_buckets]]
-binding = "STORAGE"
-bucket_name = "bitebase-storage"
 
 # Environment variables
 [vars]
 NODE_ENV = "production"
 GOOGLE_MAPS_API_KEY = "AIzaSyCfG9E3ggBc1ZBkhqTEDSBm0eYp152tMLk"
+
+# Note: The following bindings need to be created in Cloudflare Dashboard:
+# 1. KV Namespace: Create via Dashboard or CLI: wrangler kv:namespace create "CACHE"
+# 2. D1 Database: Create via Dashboard or CLI: wrangler d1 create bitebase-db
+# 3. R2 Bucket: Create via Dashboard or CLI: wrangler r2 bucket create bitebase-storage
+#
+# Then uncomment and update with actual IDs:
+#
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "actual-kv-namespace-id"
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "bitebase-db"
+# database_id = "actual-d1-database-id"
+#
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "bitebase-storage"
 
 # Secrets (set these via wrangler secret)
 # wrangler secret put DATABASE_URL
