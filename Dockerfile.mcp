@@ -1,0 +1,35 @@
+# Use Node.js 18 LTS
+FROM node:18-alpine
+
+# Install dependencies for native modules
+RUN apk add --no-cache python3 make g++
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies including MCP SDK
+RUN npm ci --only=production
+
+# Copy MCP server code
+COPY mcp/ ./mcp/
+COPY bedrock-ai.js ./
+COPY .env* ./
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Change ownership
+RUN chown -R nodejs:nodejs /app
+
+# Switch to non-root user
+USER nodejs
+
+# Expose MCP port
+EXPOSE 3002
+
+# Start MCP server
+CMD ["node", "mcp/index.js"]

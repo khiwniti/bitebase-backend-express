@@ -11,6 +11,9 @@ const rateLimit = require("express-rate-limit");
 // Import production-ready AI service
 const BedrockAI = require("./bedrock-ai");
 
+// Import MCP integration
+const { createMCPMiddleware } = require("./mcp");
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -554,8 +557,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Import routes
+const analyticsRouter = require('./routes/analytics');
+
 // Mount location intelligence routes
 app.use('/api/location', locationRouter);
+
+// Mount MCP routes
+app.use('/api/mcp', createMCPMiddleware());
+
+// Mount analytics routes
+app.use('/api/analytics', analyticsRouter);
 
 // Initialize location service on startup
 (async () => {
