@@ -1,0 +1,25 @@
+name = "bitebase-backend-prod"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
+GOOGLE_MAPS_API_KEY = "AIzaSyCfG9E3ggBc1ZBkhqTEDSBm0eYp152tMLk"
+
+# Optional: KV Namespaces for caching
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "YOUR_KV_NAMESPACE_ID"
+
+# Optional: D1 Database
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "bitebase-db"
+# database_id = "YOUR_D1_DATABASE_ID"
+
+# Optional: R2 Storage
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "bitebase-storage"

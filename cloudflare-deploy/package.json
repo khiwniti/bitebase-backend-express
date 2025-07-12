@@ -1,0 +1,15 @@
+{
+  "name": "bitebase-backend-cf",
+  "version": "2.0.0",
+  "private": true,
+  "main": "worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail",
+    "deploy:production": "wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
