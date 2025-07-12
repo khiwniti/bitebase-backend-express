@@ -1,0 +1,53 @@
+# Example wrangler.toml with actual resource IDs
+# After running the setup script, your wrangler.toml should look similar to this
+
+name = "bitebase-backend-prod"
+main = "src/worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = ""
+
+# KV Namespace for caching
+# These IDs will be generated when you run: wrangler kv:namespace create "CACHE"
+[[kv_namespaces]]
+binding = "CACHE"
+id = "abcd1234567890abcdef1234567890ab"  # Example: 32 character hex string
+preview_id = "1234abcd567890abcdef1234567890ab"  # Optional: for development
+
+# D1 Database
+# This ID will be generated when you run: wrangler d1 create bitebase-db
+[[d1_databases]]
+binding = "DB"
+database_name = "bitebase-db"
+database_id = "12345678-1234-1234-1234-123456789012"  # Example: UUID format
+
+# R2 Storage
+# The bucket name is what you specify when creating it
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "bitebase-storage"
+
+# Environment variables
+[vars]
+NODE_ENV = "production"
+GOOGLE_MAPS_API_KEY = "AIzaSyCfG9E3ggBc1ZBkhqTEDSBm0eYp152tMLk"
+
+# Environment-specific configuration
+[env.production]
+name = "bitebase-backend-prod"
+# Optional: Add custom route
+# route = "api.bitebase.com/*"
+
+[env.staging]
+name = "bitebase-backend-staging"
+# Optional: Add staging route
+# route = "api-staging.bitebase.com/*"
+
+# Secrets - Set these using wrangler CLI:
+# wrangler secret put JWT_SECRET
+# wrangler secret put DATABASE_URL
+# wrangler secret put REDIS_URL
+# wrangler secret put AWS_ACCESS_KEY_ID
+# wrangler secret put AWS_SECRET_ACCESS_KEY
