@@ -15,31 +15,40 @@ name = "bitebase-backend-staging"
 # Environment variables
 [vars]
 NODE_ENV = "production"
-GOOGLE_MAPS_API_KEY = "AIzaSyCfG9E3ggBc1ZBkhqTEDSBm0eYp152tMLk"
 
-# Note: The following bindings need to be created in Cloudflare Dashboard:
-# 1. KV Namespace: Create via Dashboard or CLI: wrangler kv:namespace create "CACHE"
-# 2. D1 Database: Create via Dashboard or CLI: wrangler d1 create bitebase-db
-# 3. R2 Bucket: Create via Dashboard or CLI: wrangler r2 bucket create bitebase-storage
-#
-# Then uncomment and update with actual IDs:
-#
+# Note: Secrets are set via wrangler secret put command
+# Required secrets:
+# - GOOGLE_PLACES_API_KEY
+# - JWT_SECRET
+# - CORS_ORIGIN
+# 
+# Optional secrets:
+# - FOURSQUARE_API_KEY
+# - DATABASE_URL
+# - REDIS_URL
+
+# KV Namespaces (uncomment and update with actual IDs after creation)
 # [[kv_namespaces]]
 # binding = "CACHE"
-# id = "actual-kv-namespace-id"
-#
+# id = "your-kv-namespace-id"
+# preview_id = "your-preview-kv-namespace-id"
+
+# D1 Database (uncomment and update with actual ID after creation)
 # [[d1_databases]]
 # binding = "DB"
 # database_name = "bitebase-db"
-# database_id = "actual-d1-database-id"
-#
+# database_id = "your-d1-database-id"
+
+# R2 Bucket (uncomment and update after creation)
 # [[r2_buckets]]
 # binding = "STORAGE"
 # bucket_name = "bitebase-storage"
 
-# Secrets (set these via wrangler secret)
-# wrangler secret put DATABASE_URL
-# wrangler secret put REDIS_URL
-# wrangler secret put JWT_SECRET
-# wrangler secret put AWS_ACCESS_KEY_ID
-# wrangler secret put AWS_SECRET_ACCESS_KEY
+# Rate limiting
+[limits]
+cpu_ms = 50
+
+# Analytics
+[analytics_engine_datasets]
+# binding = "ANALYTICS"
+# dataset = "bitebase_analytics"
