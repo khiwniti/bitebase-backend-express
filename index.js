@@ -18,7 +18,7 @@ const { createMCPMiddleware } = require("./mcp");
 const authRoutes = process.env.DATABASE_URL ? require('./routes/auth') : require('./routes/auth-mock');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 56222;
 
 // Production rate limiting
 const limiter = rateLimit({
@@ -86,6 +86,8 @@ const getAllowedOrigins = () => {
       "http://localhost:3000",
       "http://localhost:3001",
       "http://localhost:50129",
+      "http://localhost:52580",
+      "http://localhost:56222",
       "http://localhost:56338"
     );
   }

@@ -20,7 +20,13 @@ class FoursquareCacheService {
    */
   async connect() {
     try {
-      const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+      const redisUrl = process.env.REDIS_URL;
+      
+      // Don't try to connect if no Redis URL is provided
+      if (!redisUrl) {
+        console.log('⚠️ No Redis URL provided, cache service disabled');
+        return false;
+      }
       
       this.redis = Redis.createClient({
         url: redisUrl,
@@ -63,7 +69,9 @@ class FoursquareCacheService {
       return true;
     } catch (error) {
       console.error('❌ Failed to connect to Redis:', error.message);
+      console.log('⚠️ Continuing without Redis caching...');
       this.connected = false;
+      this.redis = null; // Disable Redis if connection fails
       return false;
     }
   }

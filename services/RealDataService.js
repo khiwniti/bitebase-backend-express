@@ -11,11 +11,17 @@ class RealDataService {
     });
     
     this.googleMapsClient = new Client({});
-    this.redisClient = Redis.createClient({
-      url: process.env.REDIS_URL
-    });
     
-    this.initializeConnections();
+    // Only create Redis client if Redis URL is provided
+    if (process.env.REDIS_URL) {
+      this.redisClient = Redis.createClient({
+        url: process.env.REDIS_URL
+      });
+      this.initializeConnections();
+    } else {
+      console.log('⚠️ No Redis URL provided, continuing without caching...');
+      this.redisClient = null;
+    }
   }
 
   async initializeConnections() {
@@ -24,6 +30,8 @@ class RealDataService {
       console.log('✅ Redis connected for real-time caching');
     } catch (error) {
       console.error('❌ Redis connection failed:', error);
+      console.log('⚠️ Continuing without Redis caching...');
+      this.redisClient = null; // Disable Redis if connection fails
     }
   }
 
@@ -31,10 +39,16 @@ class RealDataService {
   async getRestaurantData(location, radius = 5000) {
     const cacheKey = `restaurants:${location.lat}:${location.lng}:${radius}`;
     
-    // Check cache first
-    const cached = await this.redisClient.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
+    // Check cache first (if Redis is available)
+    if (this.redisClient) {
+      try {
+        const cached = await this.redisClient.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch (error) {
+        console.error('❌ Redis cache read error:', error);
+      }
     }
 
     try {
@@ -60,8 +74,14 @@ class RealDataService {
         photos: place.photos ? place.photos.slice(0, 3) : []
       }));
 
-      // Cache for 1 hour
-      await this.redisClient.setEx(cacheKey, 3600, JSON.stringify(restaurants));
+      // Cache for 1 hour (if Redis is available)
+      if (this.redisClient) {
+        try {
+          await this.redisClient.setEx(cacheKey, 3600, JSON.stringify(restaurants));
+        } catch (error) {
+          console.error('❌ Redis cache write error:', error);
+        }
+      }
       
       // Store in database for historical analysis
       await this.storeRestaurantData(restaurants);
@@ -118,9 +138,16 @@ class RealDataService {
   async getDemographicData(location, radius) {
     const cacheKey = `demographics:${location.lat}:${location.lng}:${radius}`;
     
-    const cached = await this.redisClient.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
+    // Check cache first (if Redis is available)
+    if (this.redisClient) {
+      try {
+        const cached = await this.redisClient.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch (error) {
+        console.error('❌ Redis cache read error:', error);
+      }
     }
 
     try {
@@ -128,8 +155,14 @@ class RealDataService {
       // This is a placeholder for real API integration
       const demographics = await this.fetchCensusData(location, radius);
       
-      // Cache for 24 hours
-      await this.redisClient.setEx(cacheKey, 86400, JSON.stringify(demographics));
+      // Cache for 24 hours (if Redis is available)
+      if (this.redisClient) {
+        try {
+          await this.redisClient.setEx(cacheKey, 86400, JSON.stringify(demographics));
+        } catch (error) {
+          console.error('❌ Redis cache write error:', error);
+        }
+      }
       
       return demographics;
     } catch (error) {

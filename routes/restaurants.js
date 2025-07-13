@@ -80,6 +80,37 @@ async function searchRestaurantsWithGooglePlaces(query, latitude, longitude, lim
   }
 }
 
+// GET /api/restaurants - Get all restaurants (for dashboard)
+router.get('/', async (req, res) => {
+  try {
+    const { 
+      latitude = 13.7563, 
+      longitude = 100.5018, 
+      limit = 20 
+    } = req.query;
+
+    console.log(`🔍 Getting all restaurants: lat=${latitude}, lng=${longitude}, limit=${limit}`);
+
+    const restaurants = await searchRestaurantsWithGooglePlaces(
+      'restaurant', 
+      parseFloat(latitude), 
+      parseFloat(longitude), 
+      parseInt(limit)
+    );
+
+    console.log(`✅ Retrieved ${restaurants.length} restaurants`);
+
+    sendResponse(res, {
+      restaurants,
+      total: restaurants.length,
+      location: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) }
+    }, `Retrieved ${restaurants.length} restaurants`);
+  } catch (error) {
+    console.error('❌ Get all restaurants error:', error);
+    sendError(res, 'Failed to get restaurants', 500, error.message);
+  }
+});
+
 // GET /api/restaurants/search - Search restaurants
 router.get('/search', async (req, res) => {
   try {
@@ -263,6 +294,202 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('❌ Restaurant details error:', error);
     sendError(res, 'Failed to get restaurant details', 500, error.message);
+  }
+});
+
+// POST /api/restaurants - Create a new restaurant (for restaurant setup)
+router.post('/', async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      cuisine,
+      priceRange,
+      address,
+      city,
+      district,
+      postalCode,
+      latitude,
+      longitude,
+      phone,
+      email,
+      website,
+      openingHours,
+      capacity,
+      averageTicket,
+      features
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !cuisine || !priceRange || !address || !phone) {
+      return sendError(res, 'Missing required fields: name, cuisine, priceRange, address, phone', 400);
+    }
+
+    // For now, create a mock restaurant ID and return success
+    // In production, this would save to the database
+    const restaurantId = Math.floor(Math.random() * 10000) + 1000;
+    
+    const newRestaurant = {
+      id: restaurantId,
+      name,
+      description,
+      cuisine,
+      priceRange,
+      address: `${address}, ${district}, ${city} ${postalCode}`,
+      city,
+      district,
+      postalCode,
+      latitude: parseFloat(latitude) || 13.7563,
+      longitude: parseFloat(longitude) || 100.5018,
+      phone,
+      email,
+      website,
+      openingHours,
+      capacity: parseInt(capacity) || 0,
+      averageTicket: parseFloat(averageTicket) || 0,
+      features: Array.isArray(features) ? features : [],
+      rating: 0,
+      reviewCount: 0,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    console.log(`✅ Restaurant created: ${name} (ID: ${restaurantId})`);
+
+    sendResponse(res, {
+      restaurant: newRestaurant,
+      message: 'Restaurant setup completed successfully!',
+      nextSteps: [
+        'Complete your market analysis',
+        'Set up your menu items',
+        'Configure analytics tracking'
+      ]
+    }, 'Restaurant created successfully', 201);
+
+  } catch (error) {
+    console.error('❌ Restaurant creation error:', error);
+    sendError(res, 'Failed to create restaurant', 500, error.message);
+  }
+});
+
+// GET /api/restaurants/user/:userId - Get restaurants for a specific user
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // For now, return mock data
+    // In production, this would query the database for user's restaurants
+    const userRestaurants = [
+      {
+        id: 1001,
+        name: 'Sample Restaurant',
+        cuisine: 'Thai',
+        priceRange: '$$',
+        address: 'Bangkok, Thailand',
+        status: 'active',
+        createdAt: new Date().toISOString()
+      }
+    ];
+
+    sendResponse(res, {
+      restaurants: userRestaurants,
+      total: userRestaurants.length,
+      userId
+    }, 'User restaurants retrieved successfully');
+
+  } catch (error) {
+    console.error('❌ User restaurants error:', error);
+    sendError(res, 'Failed to get user restaurants', 500, error.message);
+  }
+});
+
+// PUT /api/restaurants/:id - Update restaurant details
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // For now, return success with updated data
+    // In production, this would update the database
+    const updatedRestaurant = {
+      id: parseInt(id),
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+
+    console.log(`✅ Restaurant updated: ID ${id}`);
+
+    sendResponse(res, {
+      restaurant: updatedRestaurant
+    }, 'Restaurant updated successfully');
+
+  } catch (error) {
+    console.error('❌ Restaurant update error:', error);
+    sendError(res, 'Failed to update restaurant', 500, error.message);
+  }
+});
+
+// POST /api/restaurants/:id/market-analysis - Generate market analysis for a restaurant
+router.post('/:id/market-analysis', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { radius = 5, analysisType = 'comprehensive' } = req.body;
+
+    // Get restaurant location (mock for now)
+    const restaurantLat = 13.7563;
+    const restaurantLng = 100.5018;
+
+    // Search for nearby restaurants using Google Places
+    const nearbyRestaurants = await searchRestaurantsWithGooglePlaces(
+      'restaurant',
+      restaurantLat,
+      restaurantLng,
+      50 // Get more restaurants for analysis
+    );
+
+    // Perform market analysis
+    const analysis = {
+      restaurantId: parseInt(id),
+      location: {
+        latitude: restaurantLat,
+        longitude: restaurantLng,
+        radius: radius
+      },
+      analysisType,
+      competitorCount: nearbyRestaurants.length,
+      competitors: nearbyRestaurants.slice(0, 10), // Top 10 competitors
+      marketMetrics: {
+        averageRating: nearbyRestaurants.reduce((sum, r) => sum + r.rating, 0) / nearbyRestaurants.length,
+        priceDistribution: {
+          budget: nearbyRestaurants.filter(r => r.price_level <= 1).length,
+          moderate: nearbyRestaurants.filter(r => r.price_level === 2).length,
+          upscale: nearbyRestaurants.filter(r => r.price_level === 3).length,
+          fineDining: nearbyRestaurants.filter(r => r.price_level >= 4).length
+        },
+        cuisineDistribution: nearbyRestaurants.reduce((acc, r) => {
+          const cuisine = r.cuisine || 'Other';
+          acc[cuisine] = (acc[cuisine] || 0) + 1;
+          return acc;
+        }, {}),
+        marketDensity: nearbyRestaurants.length / (Math.PI * radius * radius), // restaurants per km²
+      },
+      recommendations: [
+        'Consider differentiating with unique cuisine offerings',
+        'Focus on customer service to improve ratings',
+        'Optimize pricing strategy based on local competition',
+        'Leverage location advantages for marketing'
+      ],
+      generatedAt: new Date().toISOString()
+    };
+
+    console.log(`✅ Market analysis generated for restaurant ${id}`);
+
+    sendResponse(res, analysis, 'Market analysis completed successfully');
+
+  } catch (error) {
+    console.error('❌ Market analysis error:', error);
+    sendError(res, 'Failed to generate market analysis', 500, error.message);
   }
 });
 

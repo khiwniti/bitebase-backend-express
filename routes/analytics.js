@@ -11,17 +11,25 @@ const pool = new Pool({
 });
 
 const realDataService = new RealDataService();
-const redisClient = Redis.createClient({ url: process.env.REDIS_URL });
 
-// Connect to Redis
-(async () => {
-  try {
-    await redisClient.connect();
-    console.log('✅ Redis connected for analytics caching');
-  } catch (error) {
-    console.error('❌ Redis connection failed:', error);
-  }
-})();
+// Only create Redis client if Redis URL is provided
+let redisClient = null;
+if (process.env.REDIS_URL) {
+  redisClient = Redis.createClient({ url: process.env.REDIS_URL });
+  
+  // Connect to Redis
+  (async () => {
+    try {
+      await redisClient.connect();
+      console.log('✅ Redis connected for analytics caching');
+    } catch (error) {
+      console.error('❌ Redis connection failed:', error);
+      redisClient = null; // Disable Redis if connection fails
+    }
+  })();
+} else {
+  console.log('⚠️ No Redis URL provided for analytics, continuing without caching...');
+}
 
 // Real-time metrics endpoint
 router.get('/realtime', async (req, res) => {
@@ -29,10 +37,16 @@ router.get('/realtime', async (req, res) => {
     const { range = 'today', restaurantId } = req.query;
     const cacheKey = `analytics:realtime:${restaurantId}:${range}`;
 
-    // Check cache first
-    const cached = await redisClient.get(cacheKey);
-    if (cached) {
-      return res.json(JSON.parse(cached));
+    // Check cache first (if Redis is available)
+    if (redisClient) {
+      try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+          return res.json(JSON.parse(cached));
+        }
+      } catch (error) {
+        console.error('❌ Redis cache read error:', error);
+      }
     }
 
     // Calculate date ranges
@@ -111,8 +125,14 @@ router.get('/realtime', async (req, res) => {
       lastUpdated: new Date().toISOString()
     };
 
-    // Cache for 1 minute
-    await redisClient.setEx(cacheKey, 60, JSON.stringify(response));
+    // Cache for 1 minute (if Redis is available)
+    if (redisClient) {
+      try {
+        await redisClient.setEx(cacheKey, 60, JSON.stringify(response));
+      } catch (error) {
+        console.error('❌ Redis cache write error:', error);
+      }
+    }
 
     res.json(response);
   } catch (error) {
