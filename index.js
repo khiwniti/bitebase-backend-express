@@ -7,6 +7,7 @@ const mapboxSdk = require("@mapbox/mapbox-sdk");
 const { Pool } = require("pg");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Import production-ready AI service
 const BedrockAI = require("./bedrock-ai");
@@ -351,6 +352,41 @@ app.post("/ai/chat", async (req, res) => {
   } catch (error) {
     console.error("❌ AI Chat failed:", error);
     sendError(res, "Failed to generate AI response", 500, error.message);
+  }
+});
+
+// Stripe payment intent endpoint
+app.post("/api/create-payment-intent", async (req, res) => {
+  try {
+    const { amount, currency = 'usd', plan } = req.body;
+
+    if (!amount || !plan) {
+      return sendError(res, "Amount and plan are required", 400);
+    }
+
+    // Create payment intent with Stripe
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount, // Amount in cents
+      currency: currency,
+      metadata: {
+        plan: plan,
+        timestamp: new Date().toISOString()
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log(`💳 Payment intent created: ${paymentIntent.id} for plan: ${plan}`);
+
+    sendResponse(res, {
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id
+    }, "Payment intent created successfully");
+
+  } catch (error) {
+    console.error("❌ Stripe payment intent creation failed:", error);
+    sendError(res, "Failed to create payment intent", 500, error.message);
   }
 });
 

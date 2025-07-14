@@ -28,7 +28,8 @@
     "jsonwebtoken": "^9.0.2",
     "openai": "^5.8.2",
     "pg": "^8.16.3",
-    "redis": "^4.7.0"
+    "redis": "^4.7.0",
+    "stripe": "^18.3.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3"
