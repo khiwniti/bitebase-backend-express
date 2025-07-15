@@ -73,16 +73,33 @@ class FoursquareClient {
       60000 // 1 minute
     );
     
-    // Create axios instance
-    this.client = axios.create({
-      baseURL: config.baseUrl,
+    // Determine if this is a legacy API key or new format
+    this.isLegacyKey = !config.apiKey.startsWith('fsq3');
+    
+    // Create axios instance with appropriate configuration
+    const axiosConfig = {
+      baseURL: this.isLegacyKey ? 'https://api.foursquare.com/v2' : config.baseUrl,
       timeout: config.timeout,
       headers: {
-        'Authorization': config.apiKey,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
-    });
+    };
+
+    // Set authentication based on API key type
+    if (this.isLegacyKey) {
+      // Legacy API uses client_id and client_secret in query params
+      axiosConfig.params = {
+        client_id: process.env.FOURSQUARE_CLIENT_ID,
+        client_secret: process.env.FOURSQUARE_CLIENT_SECRET,
+        v: '20231010' // API version
+      };
+    } else {
+      // New API uses Authorization header
+      axiosConfig.headers['Authorization'] = config.apiKey;
+    }
+
+    this.client = axios.create(axiosConfig);
 
     this.setupInterceptors();
     this.requestCount = 0;
@@ -243,17 +260,34 @@ class FoursquareClient {
       throw new Error('Location with lat and lng is required for venue search');
     }
 
-    const params = {
-      ll: `${location.lat},${location.lng}`,
-      radius,
-      categories: Array.isArray(categories) ? categories.join(',') : categories,
-      limit: Math.min(limit, 50), // Foursquare API limit
-      sort,
-      fields: Array.isArray(fields) ? fields.join(',') : fields
-    };
+    let params, endpoint, response;
 
-    const response = await this.get('/places/search', params);
-    return response.results || [];
+    if (this.isLegacyKey) {
+      // Legacy v2 API format
+      params = {
+        ll: `${location.lat},${location.lng}`,
+        radius,
+        categoryId: Array.isArray(categories) ? categories.join(',') : categories,
+        limit: Math.min(limit, 50),
+        intent: 'browse'
+      };
+      endpoint = '/venues/search';
+      response = await this.get(endpoint, params);
+      return response.response?.venues || [];
+    } else {
+      // New v3 API format
+      params = {
+        ll: `${location.lat},${location.lng}`,
+        radius,
+        categories: Array.isArray(categories) ? categories.join(',') : categories,
+        limit: Math.min(limit, 50),
+        sort,
+        fields: Array.isArray(fields) ? fields.join(',') : fields
+      };
+      endpoint = '/places/search';
+      response = await this.get(endpoint, params);
+      return response.results || [];
+    }
   }
 
   // Get venue details
@@ -323,10 +357,19 @@ class FoursquareClient {
   // Health check method
   async healthCheck() {
     try {
-      const response = await this.get('/places/search', {
-        ll: '40.7128,-74.0060', // NYC coordinates
-        limit: 1
-      });
+      let response;
+      if (this.isLegacyKey) {
+        response = await this.get('/venues/search', {
+          ll: '40.7128,-74.0060', // NYC coordinates
+          limit: 1,
+          intent: 'browse'
+        });
+      } else {
+        response = await this.get('/places/search', {
+          ll: '40.7128,-74.0060', // NYC coordinates
+          limit: 1
+        });
+      }
       
       return {
         status: 'healthy',

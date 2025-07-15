@@ -1,9 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { Client } = require('@googlemaps/google-maps-services-js');
+const { Pool } = require('pg');
+const { RestaurantDataService } = require('../services/RestaurantDataService');
 
-// Initialize Google Maps client
-const googleMapsClient = new Client({});
+// Initialize database connection
+const dbPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Initialize restaurant data service
+const restaurantService = new RestaurantDataService(dbPool);
 
 // Utility function for standardized API responses
 const sendResponse = (res, data, message = 'Success', status = 200) => {
@@ -26,58 +33,29 @@ const sendError = (res, message, status = 500, details = null) => {
   });
 };
 
-// Helper function to convert Google Places string ID to numeric ID
-function hashCode(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash);
-}
-
-// Helper function to transform Google Places data to frontend format
-function transformToFrontendFormat(place) {
+// Helper function to transform restaurant data to frontend format
+function transformToFrontendFormat(restaurant) {
   return {
-    id: hashCode(place.place_id), // Convert string ID to numeric
-    name: place.name,
-    latitude: place.geometry.location.lat,
-    longitude: place.geometry.location.lng,
-    rating: place.rating || 4.0,
-    price_level: place.price_level || 2,
-    cuisine: place.types?.find(type => 
-      ['restaurant', 'food', 'meal_takeaway', 'meal_delivery'].includes(type)
-    ) || 'restaurant',
-    address: place.vicinity || place.formatted_address,
-    photo_url: place.photos?.[0] ? 
-      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${process.env.GOOGLE_PLACES_API_KEY}` 
+    id: restaurant.id,
+    name: restaurant.name,
+    latitude: restaurant.latitude,
+    longitude: restaurant.longitude,
+    rating: restaurant.rating || 0,
+    price_level: restaurant.priceRange || 2,
+    cuisine: Array.isArray(restaurant.cuisine) ? restaurant.cuisine[0] : restaurant.cuisine || 'restaurant',
+    address: restaurant.address,
+    photo_url: restaurant.metadata?.photos?.[0] ? 
+      `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${restaurant.metadata.photos[0].reference}&key=${process.env.GOOGLE_PLACES_API_KEY}` 
       : null,
-    opening_hours: place.opening_hours?.open_now,
-    place_id: place.place_id,
-    types: place.types
+    opening_hours: restaurant.metadata?.openNow,
+    place_id: restaurant.metadata?.googlePlaceId || restaurant.metadata?.foursquareId,
+    types: restaurant.metadata?.types || [],
+    distance: restaurant.distance,
+    review_count: restaurant.reviewCount,
+    data_source: restaurant.dataSource,
+    created_at: restaurant.createdAt,
+    updated_at: restaurant.updatedAt
   };
-}
-
-// Search restaurants using Google Places API
-async function searchRestaurantsWithGooglePlaces(query, latitude, longitude, limit = 20) {
-  try {
-    const response = await googleMapsClient.placesNearby({
-      params: {
-        location: { lat: latitude, lng: longitude },
-        radius: 5000, // 5km radius
-        type: 'restaurant',
-        keyword: query,
-        key: process.env.GOOGLE_PLACES_API_KEY
-      }
-    });
-
-    const places = response.data.results.slice(0, limit);
-    return places.map(transformToFrontendFormat);
-  } catch (error) {
-    console.error('Google Places API error:', error);
-    throw error;
-  }
 }
 
 // GET /api/restaurants - Get all restaurants (for dashboard)
@@ -86,25 +64,42 @@ router.get('/', async (req, res) => {
     const { 
       latitude = 13.7563, 
       longitude = 100.5018, 
-      limit = 20 
+      radius = 5000,
+      cuisine,
+      priceRange,
+      rating,
+      limit = 20,
+      offset = 0,
+      sortBy = 'distance'
     } = req.query;
 
-    console.log(`🔍 Getting all restaurants: lat=${latitude}, lng=${longitude}, limit=${limit}`);
+    console.log(`🔍 Getting all restaurants: lat=${latitude}, lng=${longitude}, radius=${radius}m, limit=${limit}`);
 
-    const restaurants = await searchRestaurantsWithGooglePlaces(
-      'restaurant', 
-      parseFloat(latitude), 
-      parseFloat(longitude), 
-      parseInt(limit)
-    );
+    const searchParams = {
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      radius: parseInt(radius),
+      cuisine: cuisine ? cuisine.split(',') : null,
+      priceRange: priceRange ? parseInt(priceRange) : null,
+      rating: rating ? parseFloat(rating) : null,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      sortBy,
+      includeExternal: true
+    };
 
-    console.log(`✅ Retrieved ${restaurants.length} restaurants`);
+    const result = await restaurantService.searchRestaurants(searchParams);
+    const transformedRestaurants = result.restaurants.map(transformToFrontendFormat);
+
+    console.log(`✅ Retrieved ${transformedRestaurants.length} restaurants (${result.sources.local} local, ${result.sources.external} external)`);
 
     sendResponse(res, {
-      restaurants,
-      total: restaurants.length,
-      location: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) }
-    }, `Retrieved ${restaurants.length} restaurants`);
+      restaurants: transformedRestaurants,
+      total: result.total,
+      sources: result.sources,
+      location: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) },
+      searchParams: result.searchParams
+    }, `Retrieved ${transformedRestaurants.length} restaurants`);
   } catch (error) {
     console.error('❌ Get all restaurants error:', error);
     sendError(res, 'Failed to get restaurants', 500, error.message);
@@ -118,21 +113,45 @@ router.get('/search', async (req, res) => {
       query = 'restaurant', 
       latitude = 13.7563, 
       longitude = 100.5018, 
-      limit = 20 
+      radius = 5000,
+      cuisine,
+      priceRange,
+      rating,
+      limit = 20,
+      offset = 0,
+      sortBy = 'distance'
     } = req.query;
 
-    console.log(`🔍 Searching restaurants: query="${query}", lat=${latitude}, lng=${longitude}, limit=${limit}`);
+    console.log(`🔍 Searching restaurants: query="${query}", lat=${latitude}, lng=${longitude}, radius=${radius}m`);
 
-    const restaurants = await searchRestaurantsWithGooglePlaces(
-      query, 
-      parseFloat(latitude), 
-      parseFloat(longitude), 
-      parseInt(limit)
-    );
+    // Parse cuisine from query if not explicitly provided
+    const searchCuisine = cuisine ? cuisine.split(',') : (query !== 'restaurant' ? [query] : null);
 
-    console.log(`✅ Found ${restaurants.length} restaurants from Google Places`);
+    const searchParams = {
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      radius: parseInt(radius),
+      cuisine: searchCuisine,
+      priceRange: priceRange ? parseInt(priceRange) : null,
+      rating: rating ? parseFloat(rating) : null,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      sortBy,
+      includeExternal: true
+    };
 
-    sendResponse(res, restaurants, `Found ${restaurants.length} restaurants`);
+    const result = await restaurantService.searchRestaurants(searchParams);
+    const transformedRestaurants = result.restaurants.map(transformToFrontendFormat);
+
+    console.log(`✅ Found ${transformedRestaurants.length} restaurants (${result.sources.local} local, ${result.sources.external} external)`);
+
+    sendResponse(res, {
+      restaurants: transformedRestaurants,
+      total: result.total,
+      sources: result.sources,
+      query,
+      searchParams: result.searchParams
+    }, `Found ${transformedRestaurants.length} restaurants`);
   } catch (error) {
     console.error('❌ Restaurant search error:', error);
     sendError(res, 'Failed to search restaurants', 500, error.message);
@@ -146,26 +165,47 @@ router.post('/search', async (req, res) => {
       query = 'restaurant', 
       latitude = 13.7563, 
       longitude = 100.5018, 
-      limit = 20 
+      radius = 5000,
+      cuisine,
+      priceRange,
+      rating,
+      limit = 20,
+      offset = 0,
+      sortBy = 'distance',
+      includeExternal = true
     } = req.body;
 
-    console.log(`🔍 POST Searching restaurants: query="${query}", lat=${latitude}, lng=${longitude}, limit=${limit}`);
+    console.log(`🔍 POST Searching restaurants: query="${query}", lat=${latitude}, lng=${longitude}, radius=${radius}m`);
 
-    const restaurants = await searchRestaurantsWithGooglePlaces(
-      query, 
-      parseFloat(latitude), 
-      parseFloat(longitude), 
-      parseInt(limit)
-    );
+    // Parse cuisine from query if not explicitly provided
+    const searchCuisine = cuisine ? (Array.isArray(cuisine) ? cuisine : [cuisine]) : (query !== 'restaurant' ? [query] : null);
 
-    console.log(`✅ Found ${restaurants.length} restaurants from Google Places`);
+    const searchParams = {
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      radius: parseInt(radius),
+      cuisine: searchCuisine,
+      priceRange: priceRange ? parseInt(priceRange) : null,
+      rating: rating ? parseFloat(rating) : null,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      sortBy,
+      includeExternal
+    };
+
+    const result = await restaurantService.searchRestaurants(searchParams);
+    const transformedRestaurants = result.restaurants.map(transformToFrontendFormat);
+
+    console.log(`✅ Found ${transformedRestaurants.length} restaurants (${result.sources.local} local, ${result.sources.external} external)`);
 
     sendResponse(res, {
-      restaurants,
-      total: restaurants.length,
+      restaurants: transformedRestaurants,
+      total: result.total,
+      sources: result.sources,
       query,
-      location: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) }
-    }, `Found ${restaurants.length} restaurants`);
+      location: { latitude: parseFloat(latitude), longitude: parseFloat(longitude) },
+      searchParams: result.searchParams
+    }, `Found ${transformedRestaurants.length} restaurants`);
   } catch (error) {
     console.error('❌ Restaurant POST search error:', error);
     sendError(res, 'Failed to search restaurants', 500, error.message);
@@ -269,28 +309,62 @@ router.get('/nearby', async (req, res) => {
   }
 });
 
+// GET /api/restaurants/health - Health check for restaurant service
+router.get('/health', async (req, res) => {
+  try {
+    console.log('🔍 Checking restaurant service health');
+
+    const healthStatus = await restaurantService.healthCheck();
+
+    const status = healthStatus.status === 'healthy' ? 200 : 503;
+
+    res.status(status).json({
+      success: healthStatus.status === 'healthy',
+      message: `Restaurant service is ${healthStatus.status}`,
+      data: healthStatus,
+      timestamp: new Date().toISOString(),
+      via: 'BiteBase Restaurant API'
+    });
+
+  } catch (error) {
+    console.error('❌ Restaurant service health check error:', error);
+    sendError(res, 'Restaurant service health check failed', 503, error.message);
+  }
+});
+
+// GET /api/restaurants/stats - Get service statistics
+router.get('/stats', async (req, res) => {
+  try {
+    console.log('🔍 Getting restaurant service statistics');
+
+    const stats = restaurantService.getStats();
+
+    sendResponse(res, stats, 'Restaurant service statistics retrieved');
+
+  } catch (error) {
+    console.error('❌ Restaurant service stats error:', error);
+    sendError(res, 'Failed to get restaurant service statistics', 500, error.message);
+  }
+});
+
 // GET /api/restaurants/:id - Get restaurant details
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // For now, return mock data since we don't have a database
-    // In a real implementation, you would fetch from database or Google Places Details API
-    const restaurant = {
-      id: parseInt(id),
-      name: `Restaurant ${id}`,
-      latitude: 13.7563,
-      longitude: 100.5018,
-      rating: 4.5,
-      price_level: 2,
-      cuisine: 'Thai',
-      address: 'Bangkok, Thailand',
-      description: 'A wonderful restaurant with great food and atmosphere.',
-      opening_hours: true,
-      photos: []
-    };
+    console.log(`🔍 Getting restaurant details for ID: ${id}`);
 
-    sendResponse(res, restaurant, 'Restaurant details retrieved');
+    const restaurant = await restaurantService.getRestaurantById(id);
+    
+    if (!restaurant) {
+      return sendError(res, 'Restaurant not found', 404);
+    }
+
+    const transformedRestaurant = transformToFrontendFormat(restaurant);
+
+    console.log(`✅ Retrieved restaurant details: ${restaurant.name}`);
+
+    sendResponse(res, transformedRestaurant, 'Restaurant details retrieved');
   } catch (error) {
     console.error('❌ Restaurant details error:', error);
     sendError(res, 'Failed to get restaurant details', 500, error.message);

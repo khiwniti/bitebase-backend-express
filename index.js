@@ -9,6 +9,18 @@ const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+// Import security and monitoring middleware
+const { 
+  basicSecurity, 
+  rateLimiters, 
+  securityMonitor,
+  auditLogger 
+} = require('./middleware/security');
+const { 
+  performanceTracker, 
+  startPeriodicMonitoring 
+} = require('./middleware/monitoring');
+
 // Import production-ready AI service
 const BedrockAI = require("./bedrock-ai");
 
@@ -130,6 +142,12 @@ app.use(
     maxAge: 86400, // 24 hours
   }),
 );
+
+// Apply security middleware
+app.use(...basicSecurity());
+
+// Apply performance monitoring
+app.use(performanceTracker);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -506,9 +524,11 @@ app.use((req, res, next) => {
 const analyticsRouter = require('./routes/analytics');
 const adminRoutes = require('./routes/admin');
 const restaurantRoutes = require('./routes/restaurants');
+const aiRoutes = require('./routes/ai');
+const paymentRoutes = require('./routes/payments');
 
-// Mount auth routes
-app.use('/api/auth', authRoutes);
+// Mount auth routes with rate limiting
+app.use('/api/auth', rateLimiters.auth, authRoutes);
 
 // Mount admin routes
 app.use('/api/admin', adminRoutes);
@@ -522,8 +542,14 @@ app.use('/api/mcp', createMCPMiddleware());
 // Mount analytics routes
 app.use('/api/analytics', analyticsRouter);
 
-// Mount restaurant routes
-app.use('/api/restaurants', restaurantRoutes);
+// Mount restaurant routes with search rate limiting
+app.use('/api/restaurants', rateLimiters.search, restaurantRoutes);
+
+// Mount AI analytics routes with AI rate limiting
+app.use('/api/ai', rateLimiters.ai, aiRoutes);
+
+// Mount payment routes with payment rate limiting
+app.use('/api/payments', rateLimiters.payments, paymentRoutes);
 
 // Initialize location service on startup
 (async () => {
@@ -552,6 +578,9 @@ process.on('SIGINT', () => {
   });
 });
 
+// Start periodic monitoring
+startPeriodicMonitoring();
+
 // Start the server
 app.listen(PORT, () => {
   console.log(`🚀 BiteBase Production Backend running on port ${PORT}`);
@@ -559,6 +588,8 @@ app.listen(PORT, () => {
   console.log(`🔗 Backend URL: http://0.0.0.0:${PORT}`);
   console.log(`🤖 AI Status: ${bedrockAI ? 'Operational' : 'Unavailable'}`);
   console.log(`🗺️ Mapbox Status: ${mapboxClient ? 'Available' : 'Disabled'}`);
+  console.log(`🔒 Security: Enterprise-grade protection enabled`);
+  console.log(`📊 Monitoring: Performance tracking active`);
 });
 
 module.exports = app;

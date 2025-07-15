@@ -50,21 +50,13 @@ class LocationIntelligenceService {
       } else {
         const clientSource = discoveryHealthCheck.client_source || 'configured discovery client';
         console.warn(`⚠️ Restaurant Discovery's data source (${clientSource}) health check failed:`, discoveryHealthCheck.error || discoveryHealthCheck.reason);
-        throw new Error(`Primary data source (${clientSource}) for restaurant discovery is not accessible.`);
+        // Don't throw error - continue with available services
+        console.log('🔄 Continuing with available data sources...');
       }
 
-      // Additionally, if Foursquare is used by other parts (like trafficAnalytics, getLocalEvents), check its health.
-      // This is somewhat redundant if discovery service is also using Foursquare, but good for clarity if they diverge.
-      if (this.trafficAnalytics || true) { // Assuming trafficAnalytics always needs Foursquare for now
-          const foursquareSpecificHealth = await this.foursquareClient.healthCheck();
-          if (foursquareSpecificHealth.status === 'healthy') {
-              console.log('✅ Foursquare API connection verified (for auxiliary services like traffic/events).');
-          } else {
-              console.warn('⚠️ Foursquare API (for auxiliary services) health check failed:', foursquareSpecificHealth.error);
-              // Depending on criticality, we might throw an error or just log a warning.
-              // For now, let's consider it a warning as discovery might use Google.
-          }
-      }
+      // Skip Foursquare health check - using Google Places as primary data source
+      console.log('ℹ️ Foursquare integration disabled - using Google Places API as primary data source');
+      this.foursquareAvailable = false;
 
 
       // Set database reference for services

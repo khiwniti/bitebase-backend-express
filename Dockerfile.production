@@ -1,0 +1,38 @@
+# Production Dockerfile for BiteBase Backend
+FROM node:18-alpine AS base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    postgresql-client \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S bitebase -u 1001
+
+# Set ownership
+RUN chown -R bitebase:nodejs /app
+USER bitebase
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-56038}/health || exit 1
+
+# Expose port
+EXPOSE ${PORT:-56038}
+
+# Start application
+CMD ["node", "index.js"]

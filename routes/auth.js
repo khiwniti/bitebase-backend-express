@@ -23,54 +23,33 @@ const pool = new Pool({
 // Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Create users table if not exists
+// Create additional auth tables if not exists (users table already exists from migration)
 const initializeDatabase = async () => {
   try {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255),
-        first_name VARCHAR(100),
-        last_name VARCHAR(100),
-        phone VARCHAR(20),
-        company VARCHAR(255),
-        role VARCHAR(50) DEFAULT 'user',
-        subscription_tier VARCHAR(50) DEFAULT 'basic',
-        subscription_status VARCHAR(50) DEFAULT 'trial',
-        email_verified BOOLEAN DEFAULT false,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login TIMESTAMP,
-        google_id VARCHAR(255),
-        profile_image VARCHAR(500)
-      )
-    `);
-
-    await pool.query(`
       CREATE TABLE IF NOT EXISTS refresh_tokens (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         token VARCHAR(500) UNIQUE NOT NULL,
-        expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
     `);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         token VARCHAR(255) UNIQUE NOT NULL,
-        expires_at TIMESTAMP NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
         used BOOLEAN DEFAULT false,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )
     `);
 
-    console.log('Auth database tables initialized');
+    console.log('✅ Auth database tables initialized');
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('❌ Database initialization error:', error);
   }
 };
 
@@ -110,10 +89,10 @@ router.post('/register', async (req, res) => {
 
     // Create user
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, phone, company)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, role, subscription_tier, subscription_status`,
-      [email, passwordHash, first_name || '', last_name || '', phone || '', company || '']
+      `INSERT INTO users (email, password_hash, full_name, phone)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, email, role, subscription_tier`,
+      [email, passwordHash, `${first_name || ''} ${last_name || ''}`.trim() || email.split('@')[0], phone || '']
     );
 
     const user = result.rows[0];
@@ -136,8 +115,7 @@ router.post('/register', async (req, res) => {
           id: user.id,
           email: user.email,
           role: user.role,
-          subscription_tier: user.subscription_tier,
-          subscription_status: user.subscription_status
+          subscription_tier: user.subscription_tier
         },
         token,
         refresh_token: refreshToken,
@@ -170,8 +148,7 @@ router.post('/login', async (req, res) => {
 
     // Find user
     const result = await pool.query(
-      `SELECT id, email, password_hash, role, subscription_tier, subscription_status, 
-              first_name, last_name
+      `SELECT id, email, password_hash, role, subscription_tier, full_name
        FROM users WHERE email = $1`,
       [email]
     );
@@ -218,9 +195,8 @@ router.post('/login', async (req, res) => {
           id: user.id,
           email: user.email,
           role: user.role,
-          name: `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0],
-          subscription_tier: user.subscription_tier,
-          subscription_status: user.subscription_status
+          name: user.full_name || user.email.split('@')[0],
+          subscription_tier: user.subscription_tier
         },
         token,
         refresh_token: refreshToken,
@@ -261,8 +237,8 @@ router.post('/google', async (req, res) => {
 
     // Check if user exists
     let result = await pool.query(
-      'SELECT id, email, role, subscription_tier, subscription_status FROM users WHERE google_id = $1 OR email = $2',
-      [googleId, email]
+      'SELECT id, email, role, subscription_tier, full_name FROM users WHERE email = $1',
+      [email]
     );
 
     let user;
@@ -270,22 +246,20 @@ router.post('/google', async (req, res) => {
     if (result.rows.length === 0) {
       // Create new user
       result = await pool.query(
-        `INSERT INTO users (email, google_id, first_name, last_name, profile_image, email_verified)
-         VALUES ($1, $2, $3, $4, $5, true)
-         RETURNING id, email, role, subscription_tier, subscription_status`,
-        [email, googleId, given_name || '', family_name || '', picture || '']
+        `INSERT INTO users (email, full_name, email_verified)
+         VALUES ($1, $2, true)
+         RETURNING id, email, role, subscription_tier`,
+        [email, `${given_name || ''} ${family_name || ''}`.trim() || email.split('@')[0]]
       );
       user = result.rows[0];
     } else {
       user = result.rows[0];
       
-      // Update Google ID if not set
-      if (!user.google_id) {
-        await pool.query(
-          'UPDATE users SET google_id = $1, email_verified = true WHERE id = $2',
-          [googleId, user.id]
-        );
-      }
+      // Update email verification
+      await pool.query(
+        'UPDATE users SET email_verified = true WHERE id = $1',
+        [user.id]
+      );
     }
 
     // Update last login
@@ -312,9 +286,8 @@ router.post('/google', async (req, res) => {
           id: user.id,
           email: user.email,
           role: user.role,
-          name: `${given_name} ${family_name}`.trim() || email.split('@')[0],
-          subscription_tier: user.subscription_tier,
-          subscription_status: user.subscription_status
+          name: user.full_name || email.split('@')[0],
+          subscription_tier: user.subscription_tier
         },
         token: authToken,
         refresh_token: refreshToken,
@@ -336,8 +309,8 @@ router.post('/google', async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, first_name, last_name, role, subscription_tier, 
-              subscription_status, email_verified, created_at, profile_image
+      `SELECT id, email, full_name, role, subscription_tier, 
+              email_verified, created_at
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -356,13 +329,11 @@ router.get('/me', authenticate, async (req, res) => {
       data: {
         id: user.id,
         email: user.email,
-        name: `${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0],
+        name: user.full_name || user.email.split('@')[0],
         role: user.role,
         subscription_tier: user.subscription_tier,
-        subscription_status: user.subscription_status,
         email_verified: user.email_verified,
-        created_at: user.created_at,
-        profile_image: user.profile_image
+        created_at: user.created_at
       }
     });
   } catch (error) {

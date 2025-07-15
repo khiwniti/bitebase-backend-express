@@ -88,8 +88,11 @@ const validateConfig = () => {
     errors.push('FOURSQUARE_API_KEY environment variable is required');
   }
   
-  if (foursquareConfig.apiKey && !foursquareConfig.apiKey.startsWith('fsq_')) {
-    errors.push('FOURSQUARE_API_KEY should start with "fsq_"');
+  // API key validation - accept both new format (fsq3...) and legacy format
+  if (foursquareConfig.apiKey && 
+      !foursquareConfig.apiKey.startsWith('fsq3') && 
+      !foursquareConfig.apiKey.match(/^[A-Z0-9]{40}$/)) {
+    errors.push('FOURSQUARE_API_KEY should be either new format (fsq3...) or legacy format (40 character alphanumeric)');
   }
   
   if (errors.length > 0) {

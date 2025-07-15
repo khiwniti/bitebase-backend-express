@@ -7,6 +7,7 @@ const {
   canManageBlog,
   canManageMarketing 
 } = require('../middleware/admin');
+const { getSystemHealth, getPerformanceMetrics, checkAlerts } = require('../middleware/monitoring');
 
 /**
  * Admin Dashboard
@@ -365,6 +366,282 @@ router.get('/config', authenticate, requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching system configuration',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Enterprise Monitoring Routes
+ */
+
+// System health endpoint
+router.get('/system/health', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const health = getSystemHealth();
+    const alerts = checkAlerts();
+    
+    res.json({
+      success: true,
+      data: {
+        ...health,
+        alerts: alerts,
+        alertCount: alerts.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching system health',
+      error: error.message
+    });
+  }
+});
+
+// Performance metrics endpoint
+router.get('/system/metrics', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const metrics = getPerformanceMetrics();
+    
+    res.json({
+      success: true,
+      data: metrics
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching performance metrics',
+      error: error.message
+    });
+  }
+});
+
+// Security audit logs endpoint
+router.get('/security/audit-logs', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, startDate, endDate, userId, action } = req.query;
+    
+    // Mock audit logs (in production, fetch from database)
+    const auditLogs = [
+      {
+        id: 1,
+        timestamp: new Date().toISOString(),
+        userId: 'user_123',
+        userEmail: 'admin@bitebase.com',
+        action: 'LOGIN',
+        resource: '/api/auth/login',
+        ip: '192.168.1.100',
+        userAgent: 'Mozilla/5.0...',
+        success: true,
+        details: { method: 'email' }
+      },
+      {
+        id: 2,
+        timestamp: new Date(Date.now() - 300000).toISOString(),
+        userId: 'user_456',
+        userEmail: 'user@restaurant.com',
+        action: 'CREATE_ANALYSIS',
+        resource: '/api/ai/market-analysis',
+        ip: '10.0.0.50',
+        userAgent: 'Mozilla/5.0...',
+        success: true,
+        details: { location: 'New York, NY', analysisType: 'market' }
+      },
+      {
+        id: 3,
+        timestamp: new Date(Date.now() - 600000).toISOString(),
+        userId: 'user_789',
+        userEmail: 'suspicious@example.com',
+        action: 'FAILED_LOGIN',
+        resource: '/api/auth/login',
+        ip: '203.0.113.1',
+        userAgent: 'curl/7.68.0',
+        success: false,
+        details: { reason: 'invalid_credentials', attempts: 5 }
+      }
+    ];
+
+    const filteredLogs = auditLogs.filter(log => {
+      if (userId && log.userId !== userId) return false;
+      if (action && log.action !== action) return false;
+      if (startDate && new Date(log.timestamp) < new Date(startDate)) return false;
+      if (endDate && new Date(log.timestamp) > new Date(endDate)) return false;
+      return true;
+    });
+
+    const startIndex = (page - 1) * limit;
+    const paginatedLogs = filteredLogs.slice(startIndex, startIndex + limit);
+
+    res.json({
+      success: true,
+      data: {
+        logs: paginatedLogs,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: filteredLogs.length,
+          pages: Math.ceil(filteredLogs.length / limit)
+        },
+        summary: {
+          totalLogs: auditLogs.length,
+          successfulActions: auditLogs.filter(l => l.success).length,
+          failedActions: auditLogs.filter(l => !l.success).length,
+          uniqueUsers: [...new Set(auditLogs.map(l => l.userId))].length,
+          uniqueIPs: [...new Set(auditLogs.map(l => l.ip))].length
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching audit logs',
+      error: error.message
+    });
+  }
+});
+
+// User management endpoint
+router.get('/users', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search, status, subscriptionTier } = req.query;
+    
+    // Mock user data (in production, fetch from database)
+    const users = [
+      {
+        id: 'user_123',
+        email: 'admin@bitebase.com',
+        name: 'Admin User',
+        userType: 'ADMIN',
+        subscriptionTier: 'ENTERPRISE',
+        status: 'active',
+        lastLogin: new Date().toISOString(),
+        createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+        usage: {
+          searches: 150,
+          analyses: 45,
+          apiCalls: 1200
+        }
+      },
+      {
+        id: 'user_456',
+        email: 'owner@restaurant.com',
+        name: 'Restaurant Owner',
+        userType: 'EXISTING_OWNER',
+        subscriptionTier: 'PROFESSIONAL',
+        status: 'active',
+        lastLogin: new Date(Date.now() - 3600000).toISOString(),
+        createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+        usage: {
+          searches: 89,
+          analyses: 23,
+          apiCalls: 0
+        }
+      },
+      {
+        id: 'user_789',
+        email: 'newbie@startup.com',
+        name: 'New Entrepreneur',
+        userType: 'NEW_ENTREPRENEUR',
+        subscriptionTier: 'BASIC',
+        status: 'active',
+        lastLogin: new Date(Date.now() - 7200000).toISOString(),
+        createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+        usage: {
+          searches: 25,
+          analyses: 8,
+          apiCalls: 0
+        }
+      }
+    ];
+
+    const filteredUsers = users.filter(user => {
+      if (search && !user.email.toLowerCase().includes(search.toLowerCase()) && 
+          !user.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (status && user.status !== status) return false;
+      if (subscriptionTier && user.subscriptionTier !== subscriptionTier) return false;
+      return true;
+    });
+
+    const startIndex = (page - 1) * limit;
+    const paginatedUsers = filteredUsers.slice(startIndex, startIndex + limit);
+
+    res.json({
+      success: true,
+      data: {
+        users: paginatedUsers,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: filteredUsers.length,
+          pages: Math.ceil(filteredUsers.length / limit)
+        },
+        summary: {
+          totalUsers: users.length,
+          activeUsers: users.filter(u => u.status === 'active').length,
+          byTier: {
+            free: users.filter(u => u.subscriptionTier === 'FREE').length,
+            basic: users.filter(u => u.subscriptionTier === 'BASIC').length,
+            professional: users.filter(u => u.subscriptionTier === 'PROFESSIONAL').length,
+            enterprise: users.filter(u => u.subscriptionTier === 'ENTERPRISE').length
+          }
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching users',
+      error: error.message
+    });
+  }
+});
+
+// System alerts endpoint
+router.get('/system/alerts', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const alerts = checkAlerts();
+    
+    // Add some mock historical alerts
+    const historicalAlerts = [
+      {
+        id: 1,
+        type: 'memory',
+        severity: 'warning',
+        message: 'High memory usage: 87%',
+        timestamp: new Date(Date.now() - 3600000).toISOString(),
+        resolved: true,
+        resolvedAt: new Date(Date.now() - 3000000).toISOString()
+      },
+      {
+        id: 2,
+        type: 'performance',
+        severity: 'critical',
+        message: 'Slow average response time: 5200ms',
+        timestamp: new Date(Date.now() - 7200000).toISOString(),
+        resolved: true,
+        resolvedAt: new Date(Date.now() - 6600000).toISOString()
+      }
+    ];
+
+    res.json({
+      success: true,
+      data: {
+        active: alerts,
+        historical: historicalAlerts,
+        summary: {
+          activeCount: alerts.length,
+          criticalCount: alerts.filter(a => a.severity === 'critical').length,
+          warningCount: alerts.filter(a => a.severity === 'warning').length,
+          resolvedToday: historicalAlerts.filter(a => 
+            a.resolved && new Date(a.resolvedAt) > new Date(Date.now() - 86400000)
+          ).length
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching system alerts',
       error: error.message
     });
   }
