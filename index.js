@@ -5,6 +5,7 @@ require("dotenv").config({
 });
 const mapboxSdk = require("@mapbox/mapbox-sdk");
 const { Pool } = require("pg");
+const SQLiteAdapter = require('./database/sqlite-adapter');
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -27,8 +28,17 @@ const BedrockAI = require("./bedrock-ai");
 // Import MCP integration
 const { createMCPMiddleware } = require("./mcp");
 
-// Import auth routes - use mock if no database
-const authRoutes = process.env.DATABASE_URL ? require('./routes/auth') : require('./routes/auth-mock');
+// Import auth routes - use SQLite-compatible auth for SQLite, PostgreSQL auth for PostgreSQL, mock if no database
+let authRoutes;
+if (process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL.startsWith('sqlite:')) {
+    authRoutes = require('./routes/auth-sqlite');
+  } else {
+    authRoutes = require('./routes/auth');
+  }
+} else {
+  authRoutes = require('./routes/auth-mock');
+}
 
 const app = express();
 const PORT = process.env.PORT || 56222;
@@ -77,16 +87,30 @@ const sendError = (res, message, status = 500, details = null) => {
   });
 };
 
-// Database connection with production optimizations
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? {
-    rejectUnauthorized: false,
-  } : false,
-  max: 20, // max number of clients in pool
-  connectionTimeoutMillis: 2000,
-  idleTimeoutMillis: 30000,
-});
+// Database connection with production optimizations (only if DATABASE_URL is provided)
+let pool = null;
+if (process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL.startsWith('sqlite:')) {
+    // Use SQLite adapter
+    const dbPath = process.env.DATABASE_URL.replace('sqlite:', '');
+    pool = new SQLiteAdapter(dbPath);
+    console.log("✅ SQLite database adapter initialized");
+  } else {
+    // Use PostgreSQL pool
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === "production" ? {
+        rejectUnauthorized: false,
+      } : false,
+      max: 20, // max number of clients in pool
+      connectionTimeoutMillis: 2000,
+      idleTimeoutMillis: 30000,
+    });
+    console.log("✅ PostgreSQL database pool initialized");
+  }
+} else {
+  console.log("⚠️ Running in mock mode - no database connection");
+}
 
 // Enhanced CORS configuration for production
 const getAllowedOrigins = () => {
@@ -100,6 +124,7 @@ const getAllowedOrigins = () => {
       "http://localhost:3001",
       "http://localhost:50129",
       "http://localhost:52580",
+      "http://localhost:54538",
       "http://localhost:56222",
       "http://localhost:56338"
     );
@@ -193,7 +218,31 @@ if (process.env.MAPBOX_API_KEY) {
 // Production health check endpoint
 app.get("/health", async (req, res) => {
   try {
-    const result = await pool.query("SELECT NOW()");
+    let databaseInfo = {
+      connected: false,
+      type: "mock",
+      mode: "development"
+    };
+
+    // Only check database if pool exists
+    if (pool) {
+      try {
+        const result = await pool.query("SELECT CURRENT_TIMESTAMP");
+        const dbType = pool instanceof SQLiteAdapter ? "sqlite" : "postgresql";
+        databaseInfo = {
+          connected: true,
+          type: dbType,
+          timestamp: result.rows[0].current_time || result.rows[0].now,
+        };
+      } catch (dbError) {
+        const dbType = pool instanceof SQLiteAdapter ? "sqlite" : "postgresql";
+        databaseInfo = {
+          connected: false,
+          type: dbType,
+          error: dbError.message,
+        };
+      }
+    }
     
     const healthData = {
       status: "healthy",
@@ -201,14 +250,10 @@ app.get("/health", async (req, res) => {
       service: "bitebase-production-backend",
       version: "2.0.0",
       environment: process.env.NODE_ENV || "development",
-      database: {
-        connected: true,
-        type: "postgresql",
-        timestamp: result.rows[0].now,
-      },
+      database: databaseInfo,
       services: {
         api: true,
-        database: true,
+        database: pool ? databaseInfo.connected : false,
         ai: !!bedrockAI,
         mapbox: !!mapboxClient,
       },
@@ -226,7 +271,7 @@ app.get("/health", async (req, res) => {
       status: "unhealthy",
       timestamp: new Date().toISOString(),
       service: "bitebase-production-backend",
-      error: "Database connection failed",
+      error: error.message,
       database: {
         connected: false,
         error: error.message,
@@ -526,6 +571,11 @@ const adminRoutes = require('./routes/admin');
 const restaurantRoutes = require('./routes/restaurants');
 const aiRoutes = require('./routes/ai');
 const paymentRoutes = require('./routes/payments');
+
+// Set up database pool for auth routes if using SQLite
+if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('sqlite:') && authRoutes.setPool) {
+  authRoutes.setPool(pool);
+}
 
 // Mount auth routes with rate limiting
 app.use('/api/auth', rateLimiters.auth, authRoutes);
