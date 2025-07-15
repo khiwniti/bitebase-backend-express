@@ -1,0 +1,16 @@
+{
+  "id": "admin-001-bitebase-platform",
+  "email": "admin@bitebase.app",
+  "name": "BiteBase Administrator",
+  "userType": "ORGANIZATION",
+  "subscriptionTier": "ENTERPRISE",
+  "isAdmin": true,
+  "isActive": true,
+  "emailVerified": true,
+  "createdAt": "2025-07-15T06:44:16.649Z",
+  "updatedAt": "2025-07-15T06:44:16.649Z",
+  "password_hash": "$2b$12$EAwjZHg6IJvsMG6G/S7dx.Ue0Ya6zSGtddKPT.ijBSo8PssVIIiPK",
+  "sql": "\nINSERT INTO users (\n  id, \n  email, \n  password_hash, \n  name, \n  user_type, \n  subscription_tier, \n  is_admin, \n  is_active, \n  email_verified, \n  created_at, \n  updated_at\n) VALUES (\n  'admin-001-bitebase-platform',\n  'admin@bitebase.app',\n  '$2b$12$EAwjZHg6IJvsMG6G/S7dx.Ue0Ya6zSGtddKPT.ijBSo8PssVIIiPK',\n  'BiteBase Administrator',\n  'ORGANIZATION',\n  'ENTERPRISE',\n  true,\n  true,\n  true,\n  '2025-07-15T06:44:16.649Z',\n  '2025-07-15T06:44:16.649Z'\n) ON CONFLICT (email) DO UPDATE SET\n  password_hash = EXCLUDED.password_hash,\n  name = EXCLUDED.name,\n  user_type = EXCLUDED.user_type,\n  subscription_tier = EXCLUDED.subscription_tier,\n  is_admin = EXCLUDED.is_admin,\n  is_active = EXCLUDED.is_active,\n  email_verified = EXCLUDED.email_verified,\n  updated_at = EXCLUDED.updated_at;\n",
+  "note": "Admin user for BiteBase Intelligence Platform",
+  "created": "2025-07-15T06:44:16.921Z"
+}

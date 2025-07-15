@@ -28,16 +28,23 @@ const mockUser = {
 };
 
 const adminUser = {
-  id: 2,
+  id: 'admin-001-bitebase-platform',
   email: 'admin@bitebase.app',
   password_hash: null, // Will be set on initialization
-  first_name: 'Admin',
-  last_name: 'User',
+  first_name: 'BiteBase',
+  last_name: 'Administrator',
+  name: 'BiteBase Administrator',
   role: 'admin',
-  subscription_tier: 'enterprise',
+  userType: 'ORGANIZATION',
+  subscription_tier: 'ENTERPRISE',
   subscription_status: 'active',
+  isAdmin: true,
+  isActive: true,
   email_verified: true,
-  created_at: new Date().toISOString()
+  emailVerified: true,
+  created_at: new Date().toISOString(),
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
 };
 
 // Initialize mock users with hashed passwords
