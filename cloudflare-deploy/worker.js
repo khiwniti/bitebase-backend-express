@@ -46,6 +46,11 @@ export default {
         return handleAnalyticsEndpoints(request, env, corsHeaders);
       }
 
+      // Auth endpoints
+      if (path.startsWith('/api/auth')) {
+        return handleAuthEndpoints(request, env, corsHeaders);
+      }
+
       // MCP endpoints
       if (path.startsWith('/api/mcp')) {
         return handleMCPEndpoints(request, env, corsHeaders);
@@ -212,6 +217,183 @@ async function handleMCPEndpoints(request, env, headers) {
   }), { headers, status: 404 });
 }
 
+// Auth endpoints handler
+async function handleAuthEndpoints(request, env, headers) {
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  if (path === '/api/auth/login' && request.method === 'POST') {
+    try {
+      const body = await request.json();
+      const { email, password } = body;
+
+      // Mock authentication - in production, this would validate against a database
+      if (email && password) {
+        // Generate mock JWT token
+        const token = generateMockJWT(email);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            user: {
+              id: `user_${Date.now()}`,
+              email: email,
+              name: email.split('@')[0],
+              role: 'user',
+              subscription_tier: 'basic',
+              email_verified: true,
+              created_at: new Date().toISOString()
+            },
+            token: token,
+            expires_in: 3600
+          }
+        }), { headers, status: 200 });
+      } else {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Invalid email or password'
+        }), { headers, status: 401 });
+      }
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid request body'
+      }), { headers, status: 400 });
+    }
+  }
+
+  if (path === '/api/auth/register' && request.method === 'POST') {
+    try {
+      const body = await request.json();
+      const { email, password, name, userType } = body;
+
+      // Mock registration - in production, this would save to a database
+      if (email && password && name) {
+        const token = generateMockJWT(email);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            user: {
+              id: `user_${Date.now()}`,
+              email: email,
+              name: name,
+              role: 'user',
+              userType: userType || 'NEW_ENTREPRENEUR',
+              subscription_tier: 'basic',
+              email_verified: false,
+              created_at: new Date().toISOString()
+            },
+            token: token,
+            expires_in: 3600
+          }
+        }), { headers, status: 201 });
+      } else {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Missing required fields'
+        }), { headers, status: 400 });
+      }
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid request body'
+      }), { headers, status: 400 });
+    }
+  }
+
+  if (path === '/api/auth/me' && request.method === 'GET') {
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'No authorization token provided'
+      }), { headers, status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    // Mock token validation - in production, this would verify the JWT
+    if (token && token.length > 10) {
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          user: {
+            id: 'user_mock',
+            email: 'user@example.com',
+            name: 'Mock User',
+            role: 'user',
+            subscription_tier: 'basic',
+            email_verified: true,
+            created_at: new Date().toISOString()
+          }
+        }
+      }), { headers, status: 200 });
+    } else {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid token'
+      }), { headers, status: 401 });
+    }
+  }
+
+  if (path === '/api/auth/logout' && request.method === 'POST') {
+    // Mock logout - in production, this would invalidate the token
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Logged out successfully'
+    }), { headers, status: 200 });
+  }
+
+  // Handle other auth endpoints with mock responses
+  if (path === '/api/auth/refresh' && request.method === 'POST') {
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        token: generateMockJWT('refresh@example.com'),
+        expires_in: 3600
+      }
+    }), { headers, status: 200 });
+  }
+
+  if (path === '/api/auth/password-reset' && request.method === 'POST') {
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Password reset email sent'
+    }), { headers, status: 200 });
+  }
+
+  if (path === '/api/auth/verify-email' && request.method === 'POST') {
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Email verified successfully'
+    }), { headers, status: 200 });
+  }
+
+  if (path === '/api/auth/google' && request.method === 'POST') {
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        user: {
+          id: 'user_google',
+          email: 'google@example.com',
+          name: 'Google User',
+          role: 'user',
+          subscription_tier: 'basic',
+          email_verified: true,
+          created_at: new Date().toISOString()
+        },
+        token: generateMockJWT('google@example.com'),
+        expires_in: 3600
+      }
+    }), { headers, status: 200 });
+  }
+
+  return new Response(JSON.stringify({
+    error: 'Not Found',
+    message: 'Auth endpoint not found'
+  }), { headers, status: 404 });
+}
+
 // Helper functions
 function generateMockRestaurants(lat, lng, radius) {
   const restaurants = [];
@@ -235,4 +417,17 @@ function generateMockRestaurants(lat, lng, radius) {
 
 function generateSessionId() {
   return Math.random().toString(36).substring(2, 10);
+}
+
+function generateMockJWT(email) {
+  // Mock JWT token - in production, this would be a proper JWT
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = btoa(JSON.stringify({
+    email: email,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 3600
+  }));
+  const signature = btoa('mock_signature_' + Math.random().toString(36));
+  
+  return `${header}.${payload}.${signature}`;
 }
