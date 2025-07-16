@@ -30,14 +30,14 @@ NODE_ENV = "production"
 # KV Namespaces (uncomment and update with actual IDs after creation)
 # [[kv_namespaces]]
 # binding = "CACHE"
-# id = "your-kv-namespace-id"
-# preview_id = "your-preview-kv-namespace-id"
+# id = "955a6bac6c734235a4bdc0f5801a5dbd"
+# preview_id = "KV"
 
 # D1 Database (uncomment and update with actual ID after creation)
 # [[d1_databases]]
 # binding = "DB"
-# database_name = "bitebase-db"
-# database_id = "your-d1-database-id"
+# database_name = "bitebase-prod"
+# database_id = "0e0af49f-0162-4da5-b5fc-315a009e78b5"
 
 # R2 Bucket (uncomment and update after creation)
 # [[r2_buckets]]
