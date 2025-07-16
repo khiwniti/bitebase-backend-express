@@ -606,6 +606,10 @@ app.use('/api/ai', rateLimiters.ai, aiRoutes);
 // Mount payment routes with payment rate limiting
 app.use('/api/payments', rateLimiters.payments, paymentRoutes);
 
+// Mount menu optimization routes with search rate limiting
+const menuRoutes = require('./routes/menuRoutes');
+app.use('/api/menu', rateLimiters.search, menuRoutes);
+
 // Initialize location service on startup
 (async () => {
   try {
@@ -615,6 +619,13 @@ app.use('/api/payments', rateLimiters.payments, paymentRoutes);
     console.warn('⚠️ Location Intelligence Service initialization failed:', error.message);
   }
 })();
+
+// Initialize menu update scheduler
+const menuUpdateScheduler = require('./jobs/menuUpdateScheduler');
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_MENU_SCHEDULER === 'true') {
+  menuUpdateScheduler.start();
+  console.log('📋 Menu Update Scheduler initialized');
+}
 
 // Graceful shutdown handling
 process.on('SIGTERM', () => {
