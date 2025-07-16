@@ -1,16 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
+const SQLiteAdapter = require('../database/sqlite-adapter');
 const { RestaurantDataService } = require('../services/RestaurantDataService');
 
-// Initialize database connection
-const dbPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// Database pool will be injected by the main server
+let dbPool = null;
+let restaurantService = null;
 
-// Initialize restaurant data service
-const restaurantService = new RestaurantDataService(dbPool);
+// Function to initialize with database pool
+function initializeWithPool(pool) {
+  dbPool = pool;
+  if (pool) {
+    restaurantService = new RestaurantDataService(dbPool);
+  }
+}
+
+// Export the initialization function
+router.initializeWithPool = initializeWithPool;
+
+// Middleware to check database connection
+const checkDatabase = (req, res, next) => {
+  if (!dbPool || !restaurantService) {
+    return sendError(res, 'Database not initialized', 503, 'Restaurant service unavailable');
+  }
+  next();
+};
+
+// Apply database check middleware to all routes
+router.use(checkDatabase);
 
 // Utility function for standardized API responses
 const sendResponse = (res, data, message = 'Success', status = 200) => {
@@ -163,8 +181,9 @@ router.post('/search', async (req, res) => {
   try {
     const { 
       query = 'restaurant', 
-      latitude = 13.7563, 
-      longitude = 100.5018, 
+      location,
+      latitude: directLatitude,
+      longitude: directLongitude,
       radius = 5000,
       cuisine,
       priceRange,
@@ -174,6 +193,10 @@ router.post('/search', async (req, res) => {
       sortBy = 'distance',
       includeExternal = true
     } = req.body;
+
+    // Extract coordinates from location object or use direct values
+    const latitude = location?.latitude || directLatitude || 13.7563;
+    const longitude = location?.longitude || directLongitude || 100.5018;
 
     console.log(`🔍 POST Searching restaurants: query="${query}", lat=${latitude}, lng=${longitude}, radius=${radius}m`);
 

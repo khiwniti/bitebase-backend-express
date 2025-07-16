@@ -577,6 +577,11 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('sqlite:') &
   authRoutes.setPool(pool);
 }
 
+// Initialize restaurant routes with database pool
+if (restaurantRoutes.initializeWithPool) {
+  restaurantRoutes.initializeWithPool(pool);
+}
+
 // Mount auth routes with rate limiting
 app.use('/api/auth', rateLimiters.auth, authRoutes);
 

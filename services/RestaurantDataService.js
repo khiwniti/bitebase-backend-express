@@ -38,7 +38,7 @@ class RestaurantDataService {
       console.log(`🔍 Restaurant search: lat=${latitude}, lng=${longitude}, radius=${radius}m`);
 
       // First, search local database with PostGIS
-      const localResults = await this.searchLocalRestaurants({
+      const localSearchResult = await this.searchLocalRestaurants({
         latitude,
         longitude,
         radius,
@@ -50,6 +50,7 @@ class RestaurantDataService {
         sortBy
       });
 
+      const localResults = localSearchResult.restaurants || [];
       console.log(`📍 Found ${localResults.length} restaurants in local database`);
 
       // If we need more results or want fresh data, query external APIs
@@ -102,9 +103,163 @@ class RestaurantDataService {
   }
 
   /**
-   * Search local database using PostGIS geospatial queries
+   * Search local database using PostGIS geospatial queries or SQLite distance calculations
    */
   async searchLocalRestaurants(params) {
+    const {
+      latitude,
+      longitude,
+      radius,
+      cuisine,
+      priceRange,
+      rating,
+      limit,
+      offset,
+      sortBy
+    } = params;
+
+    try {
+      // Check if we're using SQLite or PostgreSQL
+      const isSQLite = this.db.constructor.name === 'SQLiteAdapter';
+      
+      if (isSQLite) {
+        return await this.searchLocalRestaurantsSQLite(params);
+      } else {
+        return await this.searchLocalRestaurantsPostGIS(params);
+      }
+    } catch (error) {
+      console.error('❌ Local restaurant search error:', error);
+      return { restaurants: [], total: 0 };
+    }
+  }
+
+  /**
+   * SQLite-compatible restaurant search using Haversine distance formula
+   */
+  async searchLocalRestaurantsSQLite(params) {
+    const {
+      latitude,
+      longitude,
+      radius,
+      cuisine,
+      priceRange,
+      rating,
+      limit,
+      offset,
+      sortBy
+    } = params;
+
+    try {
+      // Simple SQLite query with distance calculation
+      // Using Haversine formula approximation for distance filtering
+      let query = `
+        SELECT 
+          id,
+          name,
+          lat as latitude,
+          lng as longitude,
+          vicinity as address,
+          types as cuisine,
+          price_level as priceRange,
+          rating,
+          user_ratings_total as reviewCount,
+          phone,
+          website,
+          business_status,
+          (
+            6371000 * acos(
+              cos(radians(${latitude})) * 
+              cos(radians(lat)) * 
+              cos(radians(lng) - radians(${longitude})) + 
+              sin(radians(${latitude})) * 
+              sin(radians(lat))
+            )
+          ) as distance,
+          created_at,
+          last_updated as updated_at
+        FROM restaurants 
+        WHERE (
+          6371000 * acos(
+            cos(radians(${latitude})) * 
+            cos(radians(lat)) * 
+            cos(radians(lng) - radians(${longitude})) + 
+            sin(radians(${latitude})) * 
+            sin(radians(lat))
+          )
+        ) <= ${radius}`;
+
+      // Add filters
+      const conditions = [];
+      if (priceRange) {
+        conditions.push(`price_level = ${priceRange}`);
+      }
+      if (rating) {
+        conditions.push(`rating >= ${rating}`);
+      }
+
+      if (conditions.length > 0) {
+        query += ` AND ${conditions.join(' AND ')}`;
+      }
+
+      // Add sorting
+      if (sortBy === 'rating') {
+        query += ` ORDER BY rating DESC`;
+      } else if (sortBy === 'name') {
+        query += ` ORDER BY name ASC`;
+      } else {
+        query += ` ORDER BY distance ASC`;
+      }
+
+      // Add pagination
+      query += ` LIMIT ${limit} OFFSET ${offset}`;
+
+      console.log('🔍 SQLite Query:', query);
+
+      const result = await this.db.query(query);
+      const restaurants = [];
+
+      if (result.rows && result.rows.length > 0) {
+        for (const row of result.rows) {
+          // Parse the pipe-separated result from SQLite
+          const fields = row.result.split('|');
+          if (fields.length >= 8) {
+            restaurants.push({
+              id: fields[0],
+              name: fields[1],
+              latitude: parseFloat(fields[2]),
+              longitude: parseFloat(fields[3]),
+              address: fields[4] || '',
+              cuisine: fields[5] ? fields[5].split(',') : ['restaurant'],
+              priceRange: parseInt(fields[6]) || 2,
+              rating: parseFloat(fields[7]) || 0,
+              reviewCount: parseInt(fields[8]) || 0,
+              phone: fields[9] || '',
+              website: fields[10] || '',
+              businessStatus: fields[11] || 'OPERATIONAL',
+              distance: parseFloat(fields[12]) || 0,
+              createdAt: fields[13],
+              updatedAt: fields[14],
+              dataSource: 'local'
+            });
+          }
+        }
+      }
+
+      return {
+        restaurants,
+        total: restaurants.length,
+        source: 'local_sqlite'
+      };
+    } catch (error) {
+      console.error('❌ SQLite restaurant search error:', error);
+      return { restaurants: [], total: 0 };
+    }
+  }
+
+  /**
+   * PostgreSQL/PostGIS restaurant search (original implementation)
+   */
+  async searchLocalRestaurantsPostGIS(params) {
     const {
       latitude,
       longitude,
@@ -199,7 +354,7 @@ class RestaurantDataService {
 
       const result = await this.db.query(query, queryParams);
       
-      return result.rows.map(row => ({
+      const restaurants = result.rows.map(row => ({
         id: row.id,
         name: row.name,
         latitude: row.latitude,
@@ -218,12 +373,19 @@ class RestaurantDataService {
         distance: Math.round(row.distance_meters),
         isActive: row.is_active,
         createdAt: row.created_at,
-        updatedAt: row.updated_at
+        updatedAt: row.updated_at,
+        dataSource: 'local'
       }));
 
+      return {
+        restaurants,
+        total: restaurants.length,
+        source: 'local_postgis'
+      };
+
     } catch (error) {
-      console.error('❌ Local restaurant search error:', error);
-      throw error;
+      console.error('❌ PostGIS restaurant search error:', error);
+      return { restaurants: [], total: 0 };
     }
   }
 

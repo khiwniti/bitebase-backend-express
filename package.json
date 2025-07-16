@@ -4,9 +4,9 @@
   "description": "BiteBase AI-Powered Restaurant Intelligence Platform - Production Backend",
   "main": "index.js",
   "scripts": {
-    "start": "cross-env NODE_ENV=production PORT=56222 node index.js",
-    "dev": "cross-env NODE_ENV=development PORT=56222 node index.js",
-    "staging": "NODE_ENV=staging PORT=56222 node index.js",
+    "start": "cross-env NODE_ENV=production node index.js",
+    "dev": "cross-env NODE_ENV=development node index.js",
+    "staging": "NODE_ENV=staging node index.js",
     "build": "echo 'BiteBase Backend - Production Ready'",
     "build:cloudflare": "echo 'Building for Cloudflare Workers...' && npm run lint",
     "deploy:cloudflare": "wrangler deploy",
