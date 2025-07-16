@@ -1,54 +1,29 @@
 name = "bitebase-backend-prod"
-main = "index.js"
+main = "cloudflare-deploy/worker.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-[build]
-command = "npm run build:cloudflare"
-
-[env.production]
-name = "bitebase-backend-prod"
-
-[env.staging]
-name = "bitebase-backend-staging"
-
 # Environment variables
 [vars]
-NODE_ENV = "production"
-
-# Note: Secrets are set via wrangler secret put command
-# Required secrets:
-# - GOOGLE_PLACES_API_KEY
-# - JWT_SECRET
-# - CORS_ORIGIN
-# 
-# Optional secrets:
-# - FOURSQUARE_API_KEY
-# - DATABASE_URL
-# - REDIS_URL
-
-# KV Namespaces (uncomment and update with actual IDs after creation)
-# [[kv_namespaces]]
-# binding = "CACHE"
-# id = "955a6bac6c734235a4bdc0f5801a5dbd"
-# preview_id = "KV"
-
-# D1 Database (uncomment and update with actual ID after creation)
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "bitebase-prod"
-# database_id = "0e0af49f-0162-4da5-b5fc-315a009e78b5"
-
-# R2 Bucket (uncomment and update after creation)
-# [[r2_buckets]]
-# binding = "STORAGE"
-# bucket_name = "bitebase-storage"
+ENVIRONMENT = "production"
+GOOGLE_MAPS_API_KEY = "AIzaSyCfG9E3ggBc1ZBkhqTEDSBm0eYp152tMLk"
 
 # Rate limiting
 [limits]
 cpu_ms = 50
 
-# Analytics
-[analytics_engine_datasets]
-# binding = "ANALYTICS"
-# dataset = "bitebase_analytics"
+# Optional: KV Namespaces for caching (uncomment when needed)
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "YOUR_KV_NAMESPACE_ID"
+
+# Optional: D1 Database (uncomment when needed)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "bitebase-db"
+# database_id = "YOUR_D1_DATABASE_ID"
+
+# Optional: R2 Storage (uncomment when needed)
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "bitebase-storage"
