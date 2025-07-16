@@ -8,18 +8,22 @@ compatibility_flags = ["nodejs_compat"]
 ENVIRONMENT = "production"
 GOOGLE_MAPS_API_KEY = "AIzaSyCfG9E3ggBc1ZBkhqTEDSBm0eYp152tMLk"
 
-# Optional: KV Namespaces for caching
+# Rate limiting
+[limits]
+cpu_ms = 50
+
+# Optional: KV Namespaces for caching (uncomment when needed)
 # [[kv_namespaces]]
 # binding = "CACHE"
 # id = "YOUR_KV_NAMESPACE_ID"
 
-# Optional: D1 Database
+# Optional: D1 Database (uncomment when needed)
 # [[d1_databases]]
 # binding = "DB"
 # database_name = "bitebase-db"
 # database_id = "YOUR_D1_DATABASE_ID"
 
-# Optional: R2 Storage
+# Optional: R2 Storage (uncomment when needed)
 # [[r2_buckets]]
 # binding = "STORAGE"
 # bucket_name = "bitebase-storage"
