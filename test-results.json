@@ -1,0 +1,104 @@
+{
+  "timestamp": "2025-07-17T06:33:24.462Z",
+  "configuration": {
+    "backend_url": "http://localhost:56222",
+    "restack_url": "http://localhost:5233",
+    "agents_url": "http://localhost:5234",
+    "timeout": 30000,
+    "verbose": false
+  },
+  "summary": {
+    "total": 16,
+    "passed": 3,
+    "failed": 13,
+    "skipped": 0,
+    "success_rate": 19
+  },
+  "details": [
+    {
+      "test": "Backend API Health",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Restack Server Health",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:5233"
+    },
+    {
+      "test": "AI Agents Health",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:5234"
+    },
+    {
+      "test": "AI Services Health",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Market Analysis - Valid NYC Location",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Market Analysis - Valid LA Location",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Market Analysis - Invalid Coordinates",
+      "status": "passed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Restaurant Analytics - Valid Restaurant ID",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Restaurant Analytics - Different Date Range",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Restaurant Analytics - Missing Restaurant ID",
+      "status": "passed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Chat Intelligence - Market Analysis Query",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Chat Intelligence - Performance Query",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Chat Intelligence - General Help Query",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Chat Intelligence - Empty Message",
+      "status": "passed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Fallback Mechanisms - Market Analysis",
+      "status": "failed",
+      "response": "connect ECONNREFUSED 127.0.0.1:56222"
+    },
+    {
+      "test": "Performance Metrics - Concurrent Requests",
+      "status": "failed",
+      "response": {
+        "successful": 0,
+        "total": 3,
+        "totalTime": 7,
+        "averageTime": 2
+      }
+    }
+  ]
+}
