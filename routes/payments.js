@@ -10,6 +10,17 @@ const logger = require('../utils/logger');
 
 const stripeService = new StripeService();
 
+// Middleware to check if Stripe is available
+const requireStripe = (req, res, next) => {
+  if (!stripeService.isAvailable()) {
+    return res.status(503).json({
+      success: false,
+      error: 'Payment service is not configured - STRIPE_SECRET_KEY is required'
+    });
+  }
+  next();
+};
+
 /**
  * GET /api/payments/plans
  * Get available pricing plans
@@ -35,7 +46,7 @@ router.get('/plans', async (req, res) => {
  * POST /api/payments/create-customer
  * Create a new Stripe customer
  */
-router.post('/create-customer', async (req, res) => {
+router.post('/create-customer', requireStripe, async (req, res) => {
   try {
     const { email, name, userType } = req.body;
 
@@ -76,7 +87,7 @@ router.post('/create-customer', async (req, res) => {
  * POST /api/payments/create-checkout-session
  * Create a Stripe checkout session for subscription
  */
-router.post('/create-checkout-session', async (req, res) => {
+router.post('/create-checkout-session', requireStripe, async (req, res) => {
   try {
     const { customerId, priceId, planName } = req.body;
 
@@ -117,7 +128,7 @@ router.post('/create-checkout-session', async (req, res) => {
  * POST /api/payments/create-portal-session
  * Create a Stripe customer portal session
  */
-router.post('/create-portal-session', async (req, res) => {
+router.post('/create-portal-session', requireStripe, async (req, res) => {
   try {
     const { customerId } = req.body;
 
@@ -151,7 +162,7 @@ router.post('/create-portal-session', async (req, res) => {
  * GET /api/payments/subscription/:subscriptionId
  * Get subscription details
  */
-router.get('/subscription/:subscriptionId', async (req, res) => {
+router.get('/subscription/:subscriptionId', requireStripe, async (req, res) => {
   try {
     const { subscriptionId } = req.params;
 
@@ -186,7 +197,7 @@ router.get('/subscription/:subscriptionId', async (req, res) => {
  * POST /api/payments/cancel-subscription
  * Cancel a subscription
  */
-router.post('/cancel-subscription', async (req, res) => {
+router.post('/cancel-subscription', requireStripe, async (req, res) => {
   try {
     const { subscriptionId } = req.body;
 
@@ -221,7 +232,7 @@ router.post('/cancel-subscription', async (req, res) => {
  * GET /api/payments/customer/:customerId/subscriptions
  * Get customer's subscriptions
  */
-router.get('/customer/:customerId/subscriptions', async (req, res) => {
+router.get('/customer/:customerId/subscriptions', requireStripe, async (req, res) => {
   try {
     const { customerId } = req.params;
 
@@ -255,7 +266,7 @@ router.get('/customer/:customerId/subscriptions', async (req, res) => {
  * POST /api/payments/webhook
  * Handle Stripe webhooks
  */
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+router.post('/webhook', express.raw({ type: 'application/json' }), requireStripe, async (req, res) => {
   try {
     const signature = req.headers['stripe-signature'];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -292,7 +303,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
  * GET /api/payments/health
  * Health check for payment service
  */
-router.get('/health', async (req, res) => {
+router.get('/health', requireStripe, async (req, res) => {
   try {
     // Test Stripe connection by listing a few customers
     const customers = await stripeService.stripe.customers.list({ limit: 1 });

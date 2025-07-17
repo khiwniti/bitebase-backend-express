@@ -3,18 +3,38 @@
  * Handles subscription management, checkout sessions, and webhooks
  */
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
 const logger = require('../../utils/logger');
 
 class StripeService {
   constructor() {
     this.stripe = stripe;
+    if (!stripe) {
+      console.log('⚠️ StripeService initialized without STRIPE_SECRET_KEY - payment features will be disabled');
+    }
+  }
+
+  /**
+   * Check if Stripe is available
+   */
+  isAvailable() {
+    return !!this.stripe;
+  }
+
+  /**
+   * Throw error if Stripe is not available
+   */
+  _requireStripe() {
+    if (!this.stripe) {
+      throw new Error('Stripe is not configured - STRIPE_SECRET_KEY environment variable is required');
+    }
   }
 
   /**
    * Create a new customer in Stripe
    */
   async createCustomer(userData) {
+    this._requireStripe();
     try {
       const customer = await this.stripe.customers.create({
         email: userData.email,
@@ -37,6 +57,7 @@ class StripeService {
    * Create checkout session for subscription
    */
   async createCheckoutSession(customerId, priceId, successUrl, cancelUrl) {
+    this._requireStripe();
     try {
       const session = await this.stripe.checkout.sessions.create({
         customer: customerId,
@@ -69,6 +90,7 @@ class StripeService {
    * Create customer portal session
    */
   async createPortalSession(customerId, returnUrl) {
+    this._requireStripe();
     try {
       const session = await this.stripe.billingPortal.sessions.create({
         customer: customerId,
@@ -87,6 +109,7 @@ class StripeService {
    * Get subscription details
    */
   async getSubscription(subscriptionId) {
+    this._requireStripe();
     try {
       const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
       return subscription;
@@ -100,6 +123,7 @@ class StripeService {
    * Cancel subscription
    */
   async cancelSubscription(subscriptionId) {
+    this._requireStripe();
     try {
       const subscription = await this.stripe.subscriptions.update(subscriptionId, {
         cancel_at_period_end: true
@@ -117,6 +141,7 @@ class StripeService {
    * Get customer's subscriptions
    */
   async getCustomerSubscriptions(customerId) {
+    this._requireStripe();
     try {
       const subscriptions = await this.stripe.subscriptions.list({
         customer: customerId,
@@ -224,6 +249,7 @@ class StripeService {
    * Validate webhook signature
    */
   validateWebhookSignature(payload, signature, endpointSecret) {
+    this._requireStripe();
     try {
       const event = this.stripe.webhooks.constructEvent(
         payload,
