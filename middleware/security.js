@@ -74,14 +74,14 @@ const speedLimiters = {
   general: slowDown({
     windowMs: 15 * 60 * 1000, // 15 minutes
     delayAfter: 50, // Allow 50 requests per window at full speed
-    delayMs: 500, // Add 500ms delay per request after delayAfter
+    delayMs: () => 500, // Add 500ms delay per request after delayAfter (v2 syntax)
     maxDelayMs: 20000, // Maximum delay of 20 seconds
   }),
 
   ai: slowDown({
     windowMs: 60 * 1000, // 1 minute
     delayAfter: 5, // Allow 5 requests per minute at full speed
-    delayMs: 1000, // Add 1s delay per request after delayAfter
+    delayMs: () => 1000, // Add 1s delay per request after delayAfter (v2 syntax)
     maxDelayMs: 10000, // Maximum delay of 10 seconds
   })
 };

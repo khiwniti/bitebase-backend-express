@@ -8,7 +8,11 @@ const { Pool } = require("pg");
 const SQLiteAdapter = require('./database/sqlite-adapter');
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+if (!stripe) {
+  console.log('⚠️ Stripe not initialized - STRIPE_SECRET_KEY not provided');
+}
+const CloudflareAI = require('./services/CloudflareAI');
 
 // Import security and monitoring middleware
 const { 
@@ -22,10 +26,7 @@ const {
   startPeriodicMonitoring 
 } = require('./middleware/monitoring');
 
-// Import production-ready AI service
-const BedrockAI = require("./bedrock-ai");
-
-// Import MCP integration
+// MCP integration
 const { createMCPMiddleware } = require("./mcp");
 
 // Import auth routes - use SQLite-compatible auth for SQLite, PostgreSQL auth for PostgreSQL, mock if no database
@@ -112,6 +113,16 @@ if (process.env.DATABASE_URL) {
   console.log("⚠️ Running in mock mode - no database connection");
 }
 
+// Initialize Cloudflare AI service
+const cloudflareAI = new CloudflareAI({
+  accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+  apiToken: process.env.CLOUDFLARE_API_TOKEN
+});
+console.log('🤖 Cloudflare AI service initialized');
+
+// Legacy compatibility - bedrockAI reference for existing code
+const bedrockAI = cloudflareAI; // Point to Cloudflare AI
+
 // Enhanced CORS configuration for production
 const getAllowedOrigins = () => {
   const baseOrigins = [];
@@ -177,14 +188,7 @@ app.use(performanceTracker);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Initialize Bedrock AI with production configuration
-let bedrockAI = null;
-try {
-  bedrockAI = new BedrockAI();
-  console.log("✅ AWS Bedrock AI initialized successfully");
-} catch (error) {
-  console.error("❌ Failed to initialize Bedrock AI:", error.message);
-}
+// AI service removed from backend
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -392,25 +396,47 @@ app.post("/ai/chat", async (req, res) => {
       };
     }
 
-    // Generate AI response using Bedrock with real data
-    const response = await bedrockAI.generateResponse(
+    // Generate AI response using Cloudflare AI with real data
+    const response = await cloudflareAI.generateRestaurantResponse(
       message, 
-      context?.language || 'auto', 
-      restaurantData,
-      context?.location || null
+      {
+        restaurant_id: restaurant_id,
+        conversation_id: conversation_id,
+        user_context: {
+          language: context?.language || 'auto',
+          location: context?.location || null,
+          restaurantData: restaurantData
+        }
+      }
     );
 
-    sendResponse(res, {
-      response: response.content,
-      intent: response.intent,
-      language: response.language,
-      suggestions: response.suggestions,
-      model: response.model,
-      data_source: response.data_source,
-      tokens_used: response.tokens_used,
-      conversation_id: conversation_id || crypto.randomUUID(),
-      restaurant_id: restaurant_id
-    }, "AI response generated successfully");
+    if (response.success) {
+      sendResponse(res, {
+        response: response.response,
+        persona: response.persona,
+        language: response.language,
+        suggestions: response.suggestions,
+        model: response.model,
+        data_source: response.data_source,
+        tokens_used: response.tokens_used,
+        conversation_id: response.conversation_id || crypto.randomUUID(),
+        restaurant_id: response.restaurant_id
+      }, "AI response generated successfully");
+    } else {
+      // Use fallback response from CloudflareAI
+      sendResponse(res, {
+        response: response.fallback_response,
+        persona: 'Alex',
+        language: 'en',
+        suggestions: ['Tell me about market analysis', 'How can I optimize my menu?'],
+        model: 'cloudflare-ai-fallback',
+        data_source: 'fallback',
+        tokens_used: 0,
+        conversation_id: conversation_id || crypto.randomUUID(),
+        restaurant_id: restaurant_id,
+        error: response.error
+      }, "AI response generated (fallback mode)");
+    }
 
   } catch (error) {
     console.error("❌ AI Chat failed:", error);
@@ -609,6 +635,10 @@ app.use('/api/payments', rateLimiters.payments, paymentRoutes);
 // Mount menu optimization routes with search rate limiting
 const menuRoutes = require('./routes/menuRoutes');
 app.use('/api/menu', rateLimiters.search, menuRoutes);
+
+// Mount POS integration routes
+const posRoutes = require('./routes/pos');
+app.use('/api/pos', posRoutes);
 
 // Initialize location service on startup
 (async () => {

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
 const RealDataService = require('../services/RealDataService');
-const Redis = require('redis');
+const CloudflareKVCache = require('../services/CloudflareKVCache');
 
 // Initialize services
 const pool = new Pool({
@@ -12,23 +12,26 @@ const pool = new Pool({
 
 const realDataService = new RealDataService();
 
-// Only create Redis client if Redis URL is provided
-let redisClient = null;
-if (process.env.REDIS_URL) {
-  redisClient = Redis.createClient({ url: process.env.REDIS_URL });
+// Initialize KV cache (will use Cloudflare KV in production, local memory in development)
+let kvCache = null;
+try {
+  // In Cloudflare Workers, this would be: new CloudflareKVCache(env.ANALYTICS_CACHE)
+  // For now, initialize without KV namespace (will use local memory cache)
+  kvCache = new CloudflareKVCache();
   
-  // Connect to Redis
+  // Connect to cache
   (async () => {
     try {
-      await redisClient.connect();
-      console.log('✅ Redis connected for analytics caching');
+      await kvCache.connect();
+      console.log('✅ KV cache connected for analytics caching');
     } catch (error) {
-      console.error('❌ Redis connection failed:', error);
-      redisClient = null; // Disable Redis if connection fails
+      console.error('❌ KV cache connection failed:', error);
+      kvCache = null; // Disable cache if connection fails
     }
   })();
-} else {
-  console.log('⚠️ No Redis URL provided for analytics, continuing without caching...');
+} catch (error) {
+  console.log('⚠️ KV cache initialization failed, continuing without caching...', error.message);
+  kvCache = null;
 }
 
 // Real-time metrics endpoint
@@ -37,15 +40,15 @@ router.get('/realtime', async (req, res) => {
     const { range = 'today', restaurantId } = req.query;
     const cacheKey = `analytics:realtime:${restaurantId}:${range}`;
 
-    // Check cache first (if Redis is available)
-    if (redisClient) {
+    // Check cache first (if KV cache is available)
+    if (kvCache) {
       try {
-        const cached = await redisClient.get(cacheKey);
+        const cached = await kvCache.get(cacheKey);
         if (cached) {
-          return res.json(JSON.parse(cached));
+          return res.json(cached);
         }
       } catch (error) {
-        console.error('❌ Redis cache read error:', error);
+        console.error('❌ KV cache read error:', error);
       }
     }
 
@@ -125,12 +128,12 @@ router.get('/realtime', async (req, res) => {
       lastUpdated: new Date().toISOString()
     };
 
-    // Cache for 1 minute (if Redis is available)
-    if (redisClient) {
+    // Cache for 1 minute (if KV cache is available)
+    if (kvCache) {
       try {
-        await redisClient.setEx(cacheKey, 60, JSON.stringify(response));
+        await kvCache.set(cacheKey, response, 60); // 60 seconds TTL
       } catch (error) {
-        console.error('❌ Redis cache write error:', error);
+        console.error('❌ KV cache write error:', error);
       }
     }
 

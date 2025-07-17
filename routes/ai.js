@@ -7,11 +7,16 @@ const express = require('express');
 const router = express.Router();
 const MarketAnalysisService = require('../services/ai/MarketAnalysisService');
 const AnthropicClient = require('../services/ai/AnthropicClient');
+const CloudflareAI = require('../services/CloudflareAI');
 const logger = require('../utils/logger');
 
 // Initialize services
 const marketAnalysisService = new MarketAnalysisService();
 const anthropicClient = new AnthropicClient();
+const cloudflareAI = new CloudflareAI({
+  accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+  apiToken: process.env.CLOUDFLARE_API_TOKEN
+});
 
 /**
  * POST /api/ai/market-analysis
@@ -39,17 +44,33 @@ router.post('/market-analysis', async (req, res) => {
     
     logger.info(`Market analysis request for: ${latitude}, ${longitude}`);
     
-    const result = await marketAnalysisService.generateMarketAnalysis({
+    // Use CloudflareAI for market analysis
+    const result = await cloudflareAI.generateMarketAnalysis({
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      businessType,
+      businessType: businessType || 'restaurant',
       radius: radius ? parseInt(radius) : 1000
     });
     
     if (result.success) {
-      res.json(result);
+      res.json({
+        success: true,
+        data: result.data,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          location: { latitude, longitude },
+          businessType,
+          radius: radius || 1000,
+          model: result.model,
+          tokens_used: result.tokens_used
+        }
+      });
     } else {
-      res.status(500).json(result);
+      res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to generate market analysis',
+        fallback_data: result.fallback_data
+      });
     }
     
   } catch (error) {
@@ -79,17 +100,34 @@ router.post('/sales-forecast', async (req, res) => {
       timeframe: timeframe || '12-months'
     };
     
-    const result = await anthropicClient.generateSalesForecast(forecastData);
-    
-    res.json({
-      success: true,
-      data: result,
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        timeframe,
-        businessType
-      }
+    // Use CloudflareAI for sales forecast
+    const result = await cloudflareAI.generateBusinessRecommendations({
+      type: 'sales_forecast',
+      businessType: businessType || 'restaurant',
+      location,
+      marketData,
+      timeframe: timeframe || '12-months'
     });
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          timeframe,
+          businessType,
+          model: result.model,
+          tokens_used: result.tokens_used
+        }
+      });
+    } else {
+      res.json({
+        success: false,
+        error: result.error || 'Failed to generate sales forecast',
+        fallback_data: result.fallback_data
+      });
+    }
     
   } catch (error) {
     logger.error('Sales forecast API error:', error);
@@ -117,16 +155,32 @@ router.post('/customer-segmentation', async (req, res) => {
       demographics
     };
     
-    const result = await anthropicClient.generateCustomerSegmentation(segmentationData);
-    
-    res.json({
-      success: true,
-      data: result,
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        businessType
-      }
+    // Use CloudflareAI for customer segmentation
+    const result = await cloudflareAI.generateBusinessRecommendations({
+      type: 'customer_segmentation',
+      businessType: businessType || 'restaurant',
+      location,
+      demographics
     });
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          businessType,
+          model: result.model,
+          tokens_used: result.tokens_used
+        }
+      });
+    } else {
+      res.json({
+        success: false,
+        error: result.error || 'Failed to generate customer segmentation',
+        fallback_data: result.fallback_data
+      });
+    }
     
   } catch (error) {
     logger.error('Customer segmentation API error:', error);
@@ -155,16 +209,33 @@ router.post('/business-recommendations', async (req, res) => {
       businessGoals: businessGoals || 'Growth and profitability'
     };
     
-    const result = await anthropicClient.generateBusinessRecommendations(recommendationData);
-    
-    res.json({
-      success: true,
-      data: result,
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        businessGoals
-      }
+    // Use CloudflareAI for business recommendations
+    const result = await cloudflareAI.generateBusinessRecommendations({
+      type: 'strategic_recommendations',
+      marketAnalysis,
+      salesForecast,
+      customerSegments,
+      businessGoals: businessGoals || 'Growth and profitability'
     });
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          businessGoals,
+          model: result.model,
+          tokens_used: result.tokens_used
+        }
+      });
+    } else {
+      res.json({
+        success: false,
+        error: result.error || 'Failed to generate business recommendations',
+        fallback_data: result.fallback_data
+      });
+    }
     
   } catch (error) {
     logger.error('Business recommendations API error:', error);
@@ -194,44 +265,56 @@ router.post('/comprehensive-analysis', async (req, res) => {
     
     logger.info(`Comprehensive analysis request for: ${latitude}, ${longitude}`);
     
-    // 1. Generate market analysis
-    const marketAnalysis = await marketAnalysisService.generateMarketAnalysis({
+    // Use CloudflareAI for comprehensive analysis
+    const analysisParams = {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      businessType,
+      businessType: businessType || 'restaurant',
       radius: radius ? parseInt(radius) : 1000
-    });
+    };
+    
+    // 1. Generate market analysis
+    const marketAnalysis = await cloudflareAI.generateMarketAnalysis(analysisParams);
     
     if (!marketAnalysis.success) {
-      return res.status(500).json(marketAnalysis);
+      return res.status(500).json({
+        success: false,
+        error: marketAnalysis.error || 'Failed to generate market analysis',
+        fallback_data: marketAnalysis.fallback_data
+      });
     }
     
     // 2. Generate sales forecast
-    const salesForecast = await anthropicClient.generateSalesForecast({
+    const salesForecast = await cloudflareAI.generateBusinessRecommendations({
+      type: 'sales_forecast',
       businessType: businessType || 'restaurant',
       location: { latitude, longitude },
       marketData: marketAnalysis.data
     });
     
     // 3. Generate customer segmentation
-    const customerSegmentation = await anthropicClient.generateCustomerSegmentation({
+    const customerSegmentation = await cloudflareAI.generateBusinessRecommendations({
+      type: 'customer_segmentation',
       businessType: businessType || 'restaurant',
       location: { latitude, longitude },
-      demographics: marketAnalysis.data.demographicInsights
+      demographics: marketAnalysis.data?.demographicInsights
     });
     
     // 4. Generate business recommendations
-    const businessRecommendations = await anthropicClient.generateBusinessRecommendations({
+    const businessRecommendations = await cloudflareAI.generateBusinessRecommendations({
+      type: 'strategic_recommendations',
       marketAnalysis: marketAnalysis.data,
-      salesForecast,
-      customerSegments: customerSegmentation,
+      salesForecast: salesForecast.data,
+      customerSegments: customerSegmentation.data,
       businessGoals: 'Growth and profitability'
     });
     
     // Combine all analyses
     const comprehensiveAnalysis = {
       marketAnalysis: marketAnalysis.data,
-      salesForecast,
+      salesForecast: salesForecast.data,
+      customerSegmentation: customerSegmentation.data,
+      businessRecommendations: businessRecommendations.data,
       customerSegmentation,
       businessRecommendations,
       summary: {
