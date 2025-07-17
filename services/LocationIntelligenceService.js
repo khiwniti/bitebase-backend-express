@@ -3,18 +3,35 @@
  * Integrates all Foursquare services with caching and database persistence
  */
 
-const { FoursquareClient } = require('./FoursquareClient');
+// FoursquareClient removed - using mock implementation
 const RestaurantDiscoveryService = require('./RestaurantDiscoveryService');
 const FootTrafficAnalytics = require('./FootTrafficAnalytics');
-const FoursquareCacheService = require('./FoursquareCacheService');
+// FoursquareCacheService removed - using mock implementation
 
 class LocationIntelligenceService {
   constructor(database = null) {
-    // Initialize cache service
-    this.cache = new FoursquareCacheService();
+    // Mock cache service (FoursquareCacheService removed)
+    this.cache = {
+      connect: async () => {
+        console.log('📦 Mock cache service connected');
+        return true;
+      },
+      disconnect: async () => {
+        console.log('📦 Mock cache service disconnected');
+        return true;
+      },
+      get: async () => null,
+      set: async () => true,
+      clear: async () => true,
+      getStats: async () => ({ hits: 0, misses: 0 })
+    };
     
-    // Initialize Foursquare client (still needed for Foursquare-specific services like events, traffic)
-    this.foursquareClient = new FoursquareClient();
+    // Mock Foursquare client (service removed)
+    this.foursquareClient = {
+      getLocalEvents: async () => ({ events: [] }),
+      getUsageStats: async () => ({ usage: { calls: 0, limit: 0 } }),
+      healthCheck: async () => ({ status: 'disabled' })
+    };
     
     // Initialize services
     // RestaurantDiscoveryService now manages its own client (FSQ or Google) based on ENV var

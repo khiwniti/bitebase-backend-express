@@ -1,6 +1,5 @@
 const axios = require('axios');
 const { Pool } = require('pg');
-const BedrockAI = require('../../bedrock-ai');
 
 // Initialize PostgreSQL connection
 const pool = new Pool({
@@ -8,8 +7,18 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Initialize AI service
-const ai = new BedrockAI();
+// Mock AI service (Bedrock AI removed)
+const ai = {
+  generateResponse: async (prompt) => {
+    return {
+      choices: [{
+        message: {
+          content: 'AI service has been removed from this backend. Please use an external AI service if needed.'
+        }
+      }]
+    };
+  }
+};
 
 const seoHandlers = {
   'keywordAnalysis': async (args) => {

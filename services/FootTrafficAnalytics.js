@@ -3,11 +3,16 @@
  * Handles area traffic analysis, visit patterns, and demographic insights
  */
 
-const { FoursquareClient } = require('./FoursquareClient');
+// FoursquareClient removed - using mock implementation
 
 class FootTrafficAnalytics {
   constructor(foursquareClient = null, database = null) {
-    this.foursquare = foursquareClient || new FoursquareClient();
+    // Mock Foursquare client (service removed)
+    this.foursquare = foursquareClient || {
+      getFootTrafficData: async () => ({ traffic: [] }),
+      getVenueVisitStats: async () => ({ visits: [] }),
+      getAreaAnalytics: async () => ({ analytics: {} })
+    };
     this.db = database;
   }
 

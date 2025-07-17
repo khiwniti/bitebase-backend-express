@@ -5,13 +5,17 @@
 
 const { Pool } = require('pg');
 const { GooglePlacesClient } = require('./GooglePlacesClient');
-const { FoursquareClient } = require('./FoursquareClient');
+// FoursquareClient removed - using mock implementation
 
 class RestaurantDataService {
   constructor(dbPool) {
     this.db = dbPool;
     this.googlePlaces = new GooglePlacesClient();
-    this.foursquare = new FoursquareClient();
+    // Mock Foursquare client (service removed)
+    this.foursquare = {
+      searchVenues: async () => ({ results: [] }),
+      getVenueDetails: async () => ({ venue: null })
+    };
     this.requestCount = 0;
     this.cacheHits = 0;
     this.lastSyncTime = null;

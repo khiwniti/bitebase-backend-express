@@ -6,8 +6,8 @@
 
 require('dotenv').config(); // To access LOCATION_DATA_SOURCE
 
-const { FoursquareClient } = require('./FoursquareClient');
-const { foursquareConfig } = require('../config/foursquare');
+// FoursquareClient removed - using mock implementation
+// foursquareConfig removed - using mock config
 const { GooglePlacesClient, GooglePlacesAPIStatus } = require('./GooglePlacesClient');
 const { googlePlacesConfig } = require('../config/googlePlaces');
 
@@ -23,12 +23,13 @@ class RestaurantDiscoveryService {
       this.locationClient = new GooglePlacesClient();
       console.log('📍 RestaurantDiscoveryService initialized with Google Places API.');
     } else if (this.locationSource === LOCATION_SOURCE_FOURSQUARE) {
-      this.locationClient = new FoursquareClient(); // Assumes FoursquareClient can be instantiated without args
-      console.log('📍 RestaurantDiscoveryService initialized with Foursquare API.');
+      // Mock Foursquare client (service removed)
+      this.locationClient = this.createMockFoursquareClient();
+      console.log('📍 RestaurantDiscoveryService initialized with Mock Foursquare API.');
     } else {
-      console.warn(`⚠️ Unknown LOCATION_DATA_SOURCE: "${this.locationSource}". Defaulting to Foursquare.`);
-      this.locationClient = new FoursquareClient();
-      this.locationSource = LOCATION_SOURCE_FOURSQUARE;
+      console.warn(`⚠️ Unknown LOCATION_DATA_SOURCE: "${this.locationSource}". Defaulting to Google Places.`);
+      this.locationClient = new GooglePlacesClient();
+      this.locationSource = LOCATION_SOURCE_GOOGLE;
     }
     
     // Category mappings for different restaurant types (primarily for Foursquare)
@@ -43,6 +44,16 @@ class RestaurantDiscoveryService {
       'mexican': ['13074'], // Mexican
       'italian': ['13066'], // Italian
       'all_dining': ['13000'] // General Food and Dining
+    };
+  }
+
+  // Mock Foursquare client to replace removed service
+  createMockFoursquareClient() {
+    return {
+      searchVenues: async () => ({ results: [] }),
+      getVenueDetails: async () => ({ venue: null }),
+      getVenueVisitStats: async () => ({ visits: [] }),
+      healthCheck: async () => ({ status: 'disabled' })
     };
   }
 

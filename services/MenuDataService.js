@@ -1,10 +1,18 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const logger = require('../utils/logger');
+const fs = require('fs');
 
 class MenuDataService {
   constructor() {
-    const dbPath = path.join(__dirname, '../data/bitebase.db');
+    const dataDir = path.join(__dirname, '../data');
+    const dbPath = path.join(dataDir, 'bitebase.db');
+    
+    // Create data directory if it doesn't exist
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
     this.db = new Database(dbPath);
     this.initializeTables();
   }
