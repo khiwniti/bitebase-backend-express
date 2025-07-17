@@ -8,6 +8,7 @@ const router = express.Router();
 const MarketAnalysisService = require('../services/ai/MarketAnalysisService');
 const AnthropicClient = require('../services/ai/AnthropicClient');
 const CloudflareAI = require('../services/CloudflareAI');
+const RestackClient = require('../services/RestackClient');
 const logger = require('../utils/logger');
 
 // Initialize services
@@ -18,13 +19,21 @@ const cloudflareAI = new CloudflareAI({
   apiToken: process.env.CLOUDFLARE_API_TOKEN
 });
 
+// Initialize Restack client with fallback enabled
+const restackClient = new RestackClient({
+  restackApiUrl: process.env.RESTACK_API_URL,
+  apiKey: process.env.RESTACK_API_KEY,
+  timeout: 30000,
+  fallbackEnabled: true
+});
+
 /**
  * POST /api/ai/market-analysis
- * Generate comprehensive market analysis for a location
+ * Generate comprehensive market analysis for a location using Restack agents
  */
 router.post('/market-analysis', async (req, res) => {
   try {
-    const { latitude, longitude, businessType, radius } = req.body;
+    const { latitude, longitude, businessType, radius, restaurantId } = req.body;
     
     // Validate required parameters
     if (!latitude || !longitude) {
@@ -42,9 +51,39 @@ router.post('/market-analysis', async (req, res) => {
       });
     }
     
-    logger.info(`Market analysis request for: ${latitude}, ${longitude}`);
+    logger.info(`Market analysis request for: ${latitude}, ${longitude} (Restack-powered)`);
     
-    // Use CloudflareAI for market analysis
+    // Try Restack agent first, fall back to CloudflareAI if needed
+    try {
+      const restackResult = await restackClient.executeMarketAnalysis({
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        businessType: businessType || 'restaurant',
+        radius: radius ? parseInt(radius) : 1000,
+        restaurantId
+      });
+      
+      if (restackResult.success) {
+        return res.json({
+          success: true,
+          data: restackResult.data,
+          metadata: {
+            generatedAt: new Date().toISOString(),
+            location: { latitude, longitude },
+            businessType,
+            radius: radius || 1000,
+            workflowId: restackResult.workflowId,
+            source: restackResult.source,
+            executionTime: restackResult.executionTime,
+            provider: 'restack_agent'
+          }
+        });
+      }
+    } catch (restackError) {
+      logger.warn('Restack market analysis failed, falling back to CloudflareAI:', restackError.message);
+    }
+    
+    // Fallback to CloudflareAI
     const result = await cloudflareAI.generateMarketAnalysis({
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
@@ -62,7 +101,8 @@ router.post('/market-analysis', async (req, res) => {
           businessType,
           radius: radius || 1000,
           model: result.model,
-          tokens_used: result.tokens_used
+          tokens_used: result.tokens_used,
+          provider: 'cloudflare_ai_fallback'
         }
       });
     } else {
@@ -78,6 +118,164 @@ router.post('/market-analysis', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/ai/restaurant-analytics
+ * Generate comprehensive restaurant analytics using Restack agents
+ */
+router.post('/restaurant-analytics', async (req, res) => {
+  try {
+    const { restaurantId, dateRange, metrics } = req.body;
+    
+    // Validate required parameters
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Restaurant ID is required'
+      });
+    }
+    
+    logger.info(`Restaurant analytics request for: ${restaurantId} (Restack-powered)`);
+    
+    // Execute restaurant analytics through Restack agent
+    const restackResult = await restackClient.executeRestaurantAnalytics({
+      restaurantId,
+      dateRange: dateRange || '30d',
+      metrics: metrics || ['revenue', 'customers', 'avgOrderValue']
+    });
+    
+    if (restackResult.success) {
+      res.json({
+        success: true,
+        data: restackResult.data,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          restaurantId,
+          dateRange: dateRange || '30d',
+          workflowId: restackResult.workflowId,
+          source: restackResult.source,
+          executionTime: restackResult.executionTime,
+          provider: 'restack_agent'
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate restaurant analytics',
+        details: restackResult.error
+      });
+    }
+    
+  } catch (error) {
+    logger.error('Restaurant analytics API error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/ai/chat
+ * Intelligent chat interface using Restack agents
+ */
+router.post('/chat', async (req, res) => {
+  try {
+    const { message, context } = req.body;
+    
+    // Validate required parameters
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message is required'
+      });
+    }
+    
+    if (typeof message !== 'string' || message.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message must be a non-empty string'
+      });
+    }
+    
+    logger.info(`Chat request: "${message.substring(0, 50)}..." (Restack-powered)`);
+    
+    // Execute chat intelligence through Restack agent
+    const restackResult = await restackClient.executeChatIntelligence(message, context || {});
+    
+    if (restackResult.success) {
+      res.json({
+        success: true,
+        data: restackResult.data,
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          workflowId: restackResult.workflowId,
+          source: restackResult.source,
+          executionTime: restackResult.executionTime,
+          provider: 'restack_agent'
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process chat message',
+        details: restackResult.error
+      });
+    }
+    
+  } catch (error) {
+    logger.error('Chat API error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/ai/health
+ * Check health status of AI services including Restack
+ */
+router.get('/health', async (req, res) => {
+  try {
+    // Check Restack health
+    const restackHealth = await restackClient.healthCheck();
+    
+    // Check CloudflareAI status (basic)
+    const cloudflareStatus = {
+      healthy: !!process.env.CLOUDFLARE_API_TOKEN,
+      service: 'cloudflare_ai'
+    };
+    
+    res.json({
+      success: true,
+      services: {
+        restack: restackHealth,
+        cloudflare_ai: cloudflareStatus,
+        anthropic: {
+          healthy: !!process.env.ANTHROPIC_API_KEY,
+          service: 'anthropic'
+        }
+      },
+      overall: {
+        healthy: restackHealth.healthy || cloudflareStatus.healthy,
+        primary_provider: restackHealth.healthy ? 'restack' : 'cloudflare_ai',
+        fallback_available: true
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    logger.error('AI health check error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Health check failed',
       details: error.message
     });
   }

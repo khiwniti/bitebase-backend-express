@@ -74,7 +74,11 @@ FOURSQUARE_API_KEY=your_foursquare_key_here
 - `GET /restaurants/:id` - Get detailed restaurant information
 - `POST /restaurants/search/realtime` - Real-time restaurant search with auto-radius
 
-#### AI Analytics
+#### AI Analytics (Restack-Powered)
+- `POST /api/ai/market-analysis` - Comprehensive market analysis with competitor insights
+- `POST /api/ai/restaurant-analytics` - Performance monitoring and business intelligence
+- `POST /api/ai/chat` - Intelligent conversational AI with context persistence
+- `GET /api/ai/health` - AI services health check with Restack status
 - `POST /ai/predictive-analytics` - Generate revenue and demand forecasts
 - `POST /ai/market-segmentation` - Customer segmentation analysis
 - `POST /ai/sales-prediction` - Sales forecasting with ML models
@@ -109,7 +113,8 @@ FOURSQUARE_API_KEY=your_foursquare_key_here
 - **Runtime**: Node.js 18+
 - **Framework**: Express.js 4.21+
 - **Database**: PostgreSQL with connection pooling
-- **APIs**: Foursquare, Mapbox, Google Places
+- **AI Engine**: Restack.io with TypeScript agents
+- **APIs**: Foursquare, Mapbox, Google Places, Anthropic Claude
 - **Security**: CORS, rate limiting, input validation
 
 ### Data Flow
@@ -136,6 +141,13 @@ npm run build       # Build for production
 npm run test        # Run test suite
 npm run lint        # Run ESLint
 npm run clean       # Clean build artifacts
+
+# Restack AI Agents
+cd restack-agents
+npm run dev          # Start Restack agents in development
+npm run build        # Build TypeScript agents
+npm start           # Start agents in production
+./deploy.sh development local  # Deploy locally with Docker
 ```
 
 ### Development Workflow

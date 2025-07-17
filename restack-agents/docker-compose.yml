@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # BiteBase Restack AI Agents
+  bitebase-agents:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bitebase-restack-agents
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - RESTACK_ENVIRONMENT=${RESTACK_ENVIRONMENT:-local}
+      - RESTACK_API_URL=${RESTACK_API_URL:-http://localhost:5233}
+      - RESTACK_API_KEY=${RESTACK_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - DATABASE_URL=${DATABASE_URL}
+      - BACKEND_API_URL=${BACKEND_API_URL:-http://localhost:56222}
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
+      - MAPBOX_API_KEY=${MAPBOX_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      - "5234:5234"
+    volumes:
+      - ./src:/app/src
+      - ./dist:/app/dist
+      - ./.env:/app/.env
+    depends_on:
+      - restack-server
+    networks:
+      - bitebase-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5234/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Local Restack Server (for development)
+  restack-server:
+    image: restackio/restack:latest
+    container_name: restack-server
+    environment:
+      - RESTACK_PORT=5233
+      - RESTACK_LOG_LEVEL=${LOG_LEVEL:-info}
+      - RESTACK_ENABLE_TELEMETRY=true
+    ports:
+      - "5233:5233"
+      - "8080:8080"  # Web UI
+    volumes:
+      - restack-data:/data
+      - ./restack.config.json:/app/config.json
+    networks:
+      - bitebase-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5233/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Redis for workflow state (optional, for production-like setup)
+  redis:
+    image: redis:7-alpine
+    container_name: bitebase-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - bitebase-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL for data storage (optional, if not using external DB)
+  postgres:
+    image: postgres:15-alpine
+    container_name: bitebase-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-bitebase}
+      - POSTGRES_USER=${POSTGRES_USER:-bitebase}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-bitebase123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - bitebase-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bitebase}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  restack-data:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  bitebase-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
