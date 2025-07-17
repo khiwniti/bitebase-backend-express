@@ -17,8 +17,8 @@ RUN apk add --no-cache \
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install Node.js dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install all Node.js dependencies
+RUN npm ci
 
 # Copy source code
 COPY src ./src
@@ -26,6 +26,9 @@ COPY restack.config.json ./
 
 # Build TypeScript
 RUN npm run build
+
+# Prune dev dependencies
+RUN npm prune --production
 
 # Create non-root user
 RUN addgroup -g 1001 -S bitebase && \
