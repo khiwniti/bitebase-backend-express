@@ -4,8 +4,8 @@ services:
   # BiteBase Restack AI Agents
   bitebase-agents:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: restack-agents/Dockerfile
     container_name: bitebase-restack-agents
     environment:
       - NODE_ENV=${NODE_ENV:-development}
