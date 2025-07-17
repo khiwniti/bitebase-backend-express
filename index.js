@@ -25,6 +25,7 @@ const {
   performanceTracker, 
   startPeriodicMonitoring 
 } = require('./middleware/monitoring');
+const memoryOptimizer = require('./utils/memoryOptimizer');
 
 // MCP integration
 const { createMCPMiddleware } = require("./mcp");
@@ -658,24 +659,51 @@ if (process.env.NODE_ENV === 'production' || process.env.ENABLE_MENU_SCHEDULER =
 }
 
 // Graceful shutdown handling
+const gracefulShutdown = () => {
+  console.log('Shutting down gracefully...');
+  
+  // Clear monitoring interval
+  if (process.monitoringInterval) {
+    clearInterval(process.monitoringInterval);
+    console.log('Monitoring interval cleared');
+  }
+  
+  // Stop menu scheduler
+  if (menuUpdateScheduler && typeof menuUpdateScheduler.stop === 'function') {
+    menuUpdateScheduler.stop();
+    console.log('Menu scheduler stopped');
+  }
+  
+  // Stop memory optimizer
+  memoryOptimizer.stopMonitoring();
+  
+  // Close database pool
+  if (pool && typeof pool.end === 'function') {
+    pool.end(() => {
+      console.log('Database pool closed');
+      process.exit(0);
+    });
+  } else {
+    console.log('No database pool to close');
+    process.exit(0);
+  }
+};
+
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
-  pool.end(() => {
-    console.log('Database pool closed');
-    process.exit(0);
-  });
+  gracefulShutdown();
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully');
-  pool.end(() => {
-    console.log('Database pool closed');
-    process.exit(0);
-  });
+  gracefulShutdown();
 });
 
 // Start periodic monitoring
 startPeriodicMonitoring();
+
+// Start memory optimization
+memoryOptimizer.startMonitoring();
 
 // Start the server
 app.listen(PORT, () => {

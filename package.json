@@ -14,7 +14,6 @@
     "lint": "echo 'Backend validation complete'",
     "clean": "rm -rf dist node_modules/.cache",
     "dev-enhanced": "cross-env NODE_ENV=development PORT=12001 node enhanced-server.js",
-
     "test": "jest",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",

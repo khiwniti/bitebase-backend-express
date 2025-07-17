@@ -51,9 +51,9 @@ const performanceTracker = (req, res, next) => {
       memoryDelta: endMemory.heapUsed - startMemory.heapUsed
     });
 
-    // Keep only last 1000 entries
-    if (metrics.requests.responseTimeHistory.length > 1000) {
-      metrics.requests.responseTimeHistory = metrics.requests.responseTimeHistory.slice(-1000);
+    // Keep only last 500 entries to reduce memory usage
+    if (metrics.requests.responseTimeHistory.length > 500) {
+      metrics.requests.responseTimeHistory = metrics.requests.responseTimeHistory.slice(-500);
     }
 
     // Track status codes
@@ -79,9 +79,9 @@ const performanceTracker = (req, res, next) => {
         userAgent: req.get('User-Agent')
       });
 
-      // Keep only last 100 errors
-      if (metrics.errors.recent.length > 100) {
-        metrics.errors.recent = metrics.errors.recent.slice(-100);
+      // Keep only last 50 errors to reduce memory usage
+      if (metrics.errors.recent.length > 50) {
+        metrics.errors.recent = metrics.errors.recent.slice(-50);
       }
     }
 
@@ -110,7 +110,8 @@ const getSystemHealth = () => {
       total: Math.round(memory.heapTotal / 1024 / 1024), // MB
       external: Math.round(memory.external / 1024 / 1024), // MB
       rss: Math.round(memory.rss / 1024 / 1024), // MB
-      usage_percent: Math.round((memory.heapUsed / memory.heapTotal) * 100)
+      heap_usage_percent: Math.round((memory.heapUsed / memory.heapTotal) * 100),
+      system_usage_percent: Math.round((memory.rss / os.totalmem()) * 100)
     },
     cpu: {
       user: cpuUsage.user,
@@ -212,15 +213,19 @@ const healthCheck = (req, res, next) => {
   const health = getSystemHealth();
   
   // Determine if system is healthy
-  const memoryUsage = health.memory.usage_percent;
-  const isHealthy = memoryUsage < 90; // Consider unhealthy if memory usage > 90%
+  const systemMemoryUsage = health.memory.system_usage_percent;
+  const heapMemoryUsage = health.memory.heap_usage_percent;
+  const isHealthy = systemMemoryUsage < 80 && heapMemoryUsage < 90; // More reasonable thresholds
 
   if (!isHealthy) {
     health.status = 'unhealthy';
     health.issues = [];
     
-    if (memoryUsage > 90) {
-      health.issues.push(`High memory usage: ${memoryUsage}%`);
+    if (systemMemoryUsage > 80) {
+      health.issues.push(`High system memory usage: ${systemMemoryUsage}%`);
+    }
+    if (heapMemoryUsage > 90) {
+      health.issues.push(`High heap memory usage: ${heapMemoryUsage}%`);
     }
   }
 
@@ -235,12 +240,22 @@ const checkAlerts = () => {
   
   const alerts = [];
 
-  // Memory usage alert
-  if (health.memory.usage_percent > 85) {
+  // System memory usage alert
+  if (health.memory.system_usage_percent > 70) {
     alerts.push({
       type: 'memory',
-      severity: health.memory.usage_percent > 95 ? 'critical' : 'warning',
-      message: `High memory usage: ${health.memory.usage_percent}%`,
+      severity: health.memory.system_usage_percent > 85 ? 'critical' : 'warning',
+      message: `High system memory usage: ${health.memory.system_usage_percent}%`,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Heap memory usage alert
+  if (health.memory.heap_usage_percent > 85) {
+    alerts.push({
+      type: 'heap_memory',
+      severity: health.memory.heap_usage_percent > 95 ? 'critical' : 'warning',
+      message: `High heap memory usage: ${health.memory.heap_usage_percent}%`,
       timestamp: new Date().toISOString()
     });
   }
@@ -288,18 +303,60 @@ const formatUptime = (seconds) => {
 
 // Periodic monitoring (run every 5 minutes)
 const startPeriodicMonitoring = () => {
-  setInterval(() => {
+  const monitoringInterval = setInterval(() => {
     checkAlerts();
     
-    // Clean up old metrics
-    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    // Clean up old metrics more aggressively
+    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
+    const oldResponseHistoryLength = metrics.requests.responseTimeHistory.length;
+    const oldErrorsLength = metrics.errors.recent.length;
+    
     metrics.requests.responseTimeHistory = metrics.requests.responseTimeHistory
-      .filter(r => r.timestamp > oneHourAgo);
+      .filter(r => r.timestamp > thirtyMinutesAgo);
     
     metrics.errors.recent = metrics.errors.recent
-      .filter(e => e.timestamp > oneHourAgo);
+      .filter(e => e.timestamp > thirtyMinutesAgo);
+    
+    // Reset endpoint counters if they get too large
+    if (Object.keys(metrics.requests.byEndpoint).length > 100) {
+      const topEndpoints = Object.entries(metrics.requests.byEndpoint)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 50)
+        .reduce((acc, [key, value]) => {
+          acc[key] = value;
+          return acc;
+        }, {});
+      metrics.requests.byEndpoint = topEndpoints;
+    }
+    
+    // Log cleanup if significant
+    const cleanedResponses = oldResponseHistoryLength - metrics.requests.responseTimeHistory.length;
+    const cleanedErrors = oldErrorsLength - metrics.errors.recent.length;
+    if (cleanedResponses > 0 || cleanedErrors > 0) {
+      console.log(`🧹 Cleaned up ${cleanedResponses} response entries and ${cleanedErrors} error entries`);
+    }
+    
+    // Use memory optimizer for cleanup
+    try {
+      const memoryOptimizer = require('../utils/memoryOptimizer');
+      memoryOptimizer.cleanup(metrics, {
+        maxArraySize: 300,
+        maxObjectSize: 50
+      });
+      
+      // Force garbage collection if needed
+      memoryOptimizer.forceGarbageCollection();
+    } catch (error) {
+      // Fallback to basic GC if memory optimizer fails
+      if (global.gc) {
+        global.gc();
+      }
+    }
       
   }, 5 * 60 * 1000); // 5 minutes
+  
+  // Store interval reference for cleanup
+  process.monitoringInterval = monitoringInterval;
 };
 
 module.exports = {
