@@ -590,4 +590,105 @@ router.post('/:id/market-analysis', async (req, res) => {
   }
 });
 
+// GET /api/restaurants/search - Search restaurants with filters (for location intelligence)
+router.get('/search', async (req, res) => {
+  try {
+    const {
+      searchBy = 'brand',
+      query = '',
+      area = '',
+      cuisine = '',
+      exactMatch = 'false',
+      excludeItem = 'false',
+      page = 1,
+      limit = 50
+    } = req.query;
+
+    console.log(`🔍 Restaurant search: searchBy=${searchBy}, query=${query}, area=${area}, cuisine=${cuisine}`);
+
+    // Import the database service
+    const DatabaseService = require('../services/DatabaseService');
+    
+    // Build filters
+    const filters = {};
+    
+    if (query) {
+      if (searchBy === 'brand') {
+        filters.brand = query;
+      } else if (searchBy === 'branch') {
+        filters.area = query;
+      } else if (searchBy === 'item') {
+        filters.cuisine = query;
+      }
+    }
+    
+    if (area) filters.area = area;
+    if (cuisine) filters.cuisine = cuisine;
+
+    // Get restaurants from database
+    const restaurants = await DatabaseService.getRestaurants(filters);
+    
+    // Apply additional filtering
+    let filteredRestaurants = restaurants;
+    
+    if (query && exactMatch === 'true') {
+      filteredRestaurants = restaurants.filter(restaurant => {
+        const searchField = searchBy === 'brand' ? restaurant.brand : 
+                           searchBy === 'branch' ? restaurant.area : 
+                           restaurant.cuisine;
+        return searchField.toLowerCase() === query.toLowerCase();
+      });
+    }
+
+    if (excludeItem === 'true' && query) {
+      filteredRestaurants = filteredRestaurants.filter(restaurant => {
+        const searchField = searchBy === 'brand' ? restaurant.brand : 
+                           searchBy === 'branch' ? restaurant.area : 
+                           restaurant.cuisine;
+        return !searchField.toLowerCase().includes(query.toLowerCase());
+      });
+    }
+
+    // Calculate statistics
+    const stats = {
+      averagePrice: filteredRestaurants.length > 0 
+        ? Math.round(filteredRestaurants.reduce((sum, r) => sum + (r.medianPrice || 0), 0) / filteredRestaurants.length)
+        : 0,
+      totalBrands: new Set(filteredRestaurants.map(r => r.brand)).size,
+      totalItems: filteredRestaurants.length
+    };
+
+    // Pagination
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedResults = filteredRestaurants.slice(startIndex, endIndex);
+
+    const result = {
+      restaurants: paginatedResults,
+      stats,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: filteredRestaurants.length,
+        totalPages: Math.ceil(filteredRestaurants.length / parseInt(limit))
+      },
+      filters: {
+        searchBy,
+        query,
+        area,
+        cuisine,
+        exactMatch: exactMatch === 'true',
+        excludeItem: excludeItem === 'true'
+      }
+    };
+
+    console.log(`✅ Restaurant search completed: ${filteredRestaurants.length} results found`);
+
+    sendResponse(res, result, 'Restaurant search completed successfully');
+  } catch (error) {
+    console.error('❌ Restaurant search error:', error);
+    sendError(res, 'Restaurant search failed', 500, error.message);
+  }
+});
+
 module.exports = router;

@@ -27,6 +27,7 @@
     "@mapbox/mapbox-sdk": "^0.16.1",
     "@modelcontextprotocol/sdk": "^0.5.0",
     "axios": "^1.10.0",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.2.0",
     "compression": "^1.8.0",
@@ -42,6 +43,7 @@
     "openai": "^5.8.2",
     "pg": "^8.16.3",
     "redis": "^4.7.0",
+    "sqlite3": "^5.1.7",
     "stripe": "^18.3.0"
   },
   "devDependencies": {

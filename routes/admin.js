@@ -8,6 +8,9 @@ const {
   canManageMarketing 
 } = require('../middleware/admin');
 const { getSystemHealth, getPerformanceMetrics, checkAlerts } = require('../middleware/monitoring');
+const DatabaseService = require('../services/DatabaseService');
+const KVService = require('../services/KVService');
+const AnalyticsService = require('../services/AnalyticsService');
 
 /**
  * Admin Dashboard
@@ -646,5 +649,510 @@ router.get('/system/alerts', authenticate, requireAdmin, async (req, res) => {
     });
   }
 });
+
+/**
+ * Restaurant Management Routes for Admin
+ */
+
+// Get all restaurants with location-based insights
+router.get('/restaurants', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, city, area, cuisine, search } = req.query;
+    
+    // Build filters
+    const filters = {};
+    if (city) filters.city = city;
+    if (area) filters.area = area;
+    if (cuisine) filters.cuisine = cuisine;
+    if (search) filters.brand = search;
+
+    // Get restaurants from database
+    const allRestaurants = await DatabaseService.getRestaurants(filters);
+    
+    // Apply search filter if provided
+    let filteredRestaurants = allRestaurants;
+    if (search) {
+      filteredRestaurants = allRestaurants.filter(r => 
+        r.brand.toLowerCase().includes(search.toLowerCase()) ||
+        r.area.toLowerCase().includes(search.toLowerCase()) ||
+        r.cuisine.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    // Pagination
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedRestaurants = filteredRestaurants.slice(startIndex, startIndex + parseInt(limit));
+
+    // Add analytics data for each restaurant
+    const restaurantsWithAnalytics = await Promise.all(
+      paginatedRestaurants.map(async (restaurant) => {
+        const analytics = await AnalyticsService.getRestaurantAnalytics(restaurant.id, 7);
+        return {
+          ...restaurant,
+          weeklyStats: analytics.summary || {},
+          lastUpdated: new Date().toISOString()
+        };
+      })
+    );
+
+    // Calculate summary statistics
+    const summary = {
+      totalRestaurants: filteredRestaurants.length,
+      averageRating: filteredRestaurants.reduce((sum, r) => sum + (r.rating || 0), 0) / filteredRestaurants.length,
+      averagePrice: filteredRestaurants.reduce((sum, r) => sum + (r.medianPrice || 0), 0) / filteredRestaurants.length,
+      topCuisines: getTopCuisines(filteredRestaurants),
+      topAreas: getTopAreas(filteredRestaurants),
+      ratingDistribution: getRatingDistribution(filteredRestaurants)
+    };
+
+    res.json({
+      success: true,
+      data: {
+        restaurants: restaurantsWithAnalytics,
+        summary,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: filteredRestaurants.length,
+          totalPages: Math.ceil(filteredRestaurants.length / parseInt(limit))
+        },
+        filters: { city, area, cuisine, search }
+      }
+    });
+  } catch (error) {
+    console.error('Admin restaurants error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching restaurants',
+      error: error.message
+    });
+  }
+});
+
+// Get detailed restaurant information with Wongnai integration
+router.get('/restaurants/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get restaurant details
+    const restaurant = await DatabaseService.getRestaurantById(id);
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant not found'
+      });
+    }
+
+    // Get comprehensive analytics
+    const analytics = await AnalyticsService.getRestaurantAnalytics(id, 30);
+    
+    // Get location insights
+    const locationInsights = await KVService.getCachedLocationInsights(restaurant.area) || {};
+    
+    // Mock Wongnai integration data
+    const wongnaiData = {
+      wongnaiId: `wongnai_${id}`,
+      wongnaiRating: restaurant.rating + (Math.random() * 0.2 - 0.1),
+      wongnaiReviews: restaurant.totalReviews + Math.floor(Math.random() * 100),
+      popularDishes: [
+        { name: 'Signature Dish', price: restaurant.medianPrice * 1.2, orders: 150 },
+        { name: 'Popular Item', price: restaurant.medianPrice * 0.8, orders: 120 },
+        { name: 'Special Menu', price: restaurant.medianPrice * 1.5, orders: 80 }
+      ],
+      menuCategories: [
+        { category: 'Main Dishes', count: 15, avgPrice: restaurant.medianPrice },
+        { category: 'Appetizers', count: 8, avgPrice: restaurant.medianPrice * 0.6 },
+        { category: 'Beverages', count: 12, avgPrice: restaurant.medianPrice * 0.4 },
+        { category: 'Desserts', count: 6, avgPrice: restaurant.medianPrice * 0.7 }
+      ],
+      operatingHours: {
+        monday: '10:00-22:00',
+        tuesday: '10:00-22:00',
+        wednesday: '10:00-22:00',
+        thursday: '10:00-22:00',
+        friday: '10:00-23:00',
+        saturday: '10:00-23:00',
+        sunday: '10:00-22:00'
+      },
+      features: ['Delivery', 'Takeaway', 'Dine-in', 'Online Payment'],
+      photos: [
+        'https://example.com/photo1.jpg',
+        'https://example.com/photo2.jpg',
+        'https://example.com/photo3.jpg'
+      ],
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Get nearby competitors
+    const competitors = await DatabaseService.getRestaurants({ 
+      area: restaurant.area,
+      cuisine: restaurant.cuisine 
+    });
+    const nearbyCompetitors = competitors
+      .filter(c => c.id !== restaurant.id)
+      .slice(0, 5)
+      .map(c => ({
+        ...c,
+        distance: (Math.random() * 2 + 0.1).toFixed(1) + ' km',
+        competitionLevel: calculateCompetitionLevel(restaurant, c)
+      }));
+
+    // Market position analysis
+    const marketPosition = calculateMarketPosition(restaurant, competitors);
+
+    const detailedData = {
+      restaurant,
+      analytics,
+      wongnaiData,
+      locationInsights,
+      nearbyCompetitors,
+      marketPosition,
+      insights: generateRestaurantInsights(restaurant, analytics, competitors),
+      lastUpdated: new Date().toISOString()
+    };
+
+    res.json({
+      success: true,
+      data: detailedData
+    });
+  } catch (error) {
+    console.error('Admin restaurant details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching restaurant details',
+      error: error.message
+    });
+  }
+});
+
+// Get location-based analytics dashboard
+router.get('/analytics/location', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { city = 'Bangkok', timeframe = '30d' } = req.query;
+    
+    // Check cache first
+    const cacheKey = `admin_location_analytics:${city}:${timeframe}`;
+    const cached = await KVService.get(cacheKey);
+    if (cached) {
+      return res.json({
+        success: true,
+        data: JSON.parse(cached)
+      });
+    }
+
+    // Get all restaurants in the city
+    const restaurants = await DatabaseService.getRestaurants({ city });
+    
+    // Get system analytics
+    const systemAnalytics = await AnalyticsService.getDashboardAnalytics(30);
+    
+    // Calculate location-based insights
+    const locationAnalytics = {
+      overview: {
+        totalRestaurants: restaurants.length,
+        averageRating: restaurants.reduce((sum, r) => sum + (r.rating || 0), 0) / restaurants.length,
+        totalReviews: restaurants.reduce((sum, r) => sum + (r.totalReviews || 0), 0),
+        averagePrice: restaurants.reduce((sum, r) => sum + (r.medianPrice || 0), 0) / restaurants.length
+      },
+      areaBreakdown: getAreaBreakdown(restaurants),
+      cuisineAnalysis: getCuisineAnalysis(restaurants),
+      priceAnalysis: getPriceAnalysis(restaurants),
+      ratingAnalysis: getRatingAnalysis(restaurants),
+      competitionHeatmap: generateCompetitionHeatmap(restaurants),
+      marketOpportunities: identifyMarketOpportunities(restaurants),
+      trends: {
+        growingAreas: ['Thonglor', 'Ekkamai', 'Ari'],
+        decliningAreas: ['Khao San Road'],
+        emergingCuisines: ['Korean', 'Plant-based', 'Fusion'],
+        saturatedCuisines: ['Thai Traditional', 'Chinese']
+      },
+      systemMetrics: systemAnalytics,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Cache for 1 hour
+    await KVService.set(cacheKey, JSON.stringify(locationAnalytics), 3600);
+
+    res.json({
+      success: true,
+      data: locationAnalytics
+    });
+  } catch (error) {
+    console.error('Admin location analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching location analytics',
+      error: error.message
+    });
+  }
+});
+
+// Helper functions
+function getTopCuisines(restaurants) {
+  const cuisineCount = {};
+  restaurants.forEach(r => {
+    cuisineCount[r.cuisine] = (cuisineCount[r.cuisine] || 0) + 1;
+  });
+  
+  return Object.entries(cuisineCount)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([cuisine, count]) => ({ cuisine, count }));
+}
+
+function getTopAreas(restaurants) {
+  const areaCount = {};
+  restaurants.forEach(r => {
+    areaCount[r.area] = (areaCount[r.area] || 0) + 1;
+  });
+  
+  return Object.entries(areaCount)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([area, count]) => ({ area, count }));
+}
+
+function getRatingDistribution(restaurants) {
+  const distribution = { '1-2': 0, '2-3': 0, '3-4': 0, '4-5': 0 };
+  restaurants.forEach(r => {
+    const rating = r.rating || 0;
+    if (rating >= 4) distribution['4-5']++;
+    else if (rating >= 3) distribution['3-4']++;
+    else if (rating >= 2) distribution['2-3']++;
+    else distribution['1-2']++;
+  });
+  return distribution;
+}
+
+function calculateCompetitionLevel(restaurant, competitor) {
+  const ratingDiff = Math.abs((restaurant.rating || 0) - (competitor.rating || 0));
+  const priceDiff = Math.abs((restaurant.medianPrice || 0) - (competitor.medianPrice || 0));
+  
+  if (ratingDiff < 0.5 && priceDiff < 50) return 'High';
+  if (ratingDiff < 1.0 && priceDiff < 100) return 'Medium';
+  return 'Low';
+}
+
+function calculateMarketPosition(restaurant, competitors) {
+  const sameAreaCompetitors = competitors.filter(c => c.area === restaurant.area);
+  const sameCuisineCompetitors = competitors.filter(c => c.cuisine === restaurant.cuisine);
+  
+  const areaRank = sameAreaCompetitors
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .findIndex(r => r.id === restaurant.id) + 1;
+    
+  const cuisineRank = sameCuisineCompetitors
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .findIndex(r => r.id === restaurant.id) + 1;
+  
+  return {
+    areaRank,
+    areaTotal: sameAreaCompetitors.length,
+    cuisineRank,
+    cuisineTotal: sameCuisineCompetitors.length,
+    percentile: {
+      area: Math.round((1 - areaRank / sameAreaCompetitors.length) * 100),
+      cuisine: Math.round((1 - cuisineRank / sameCuisineCompetitors.length) * 100)
+    }
+  };
+}
+
+function generateRestaurantInsights(restaurant, analytics, competitors) {
+  const insights = [];
+  
+  // Rating insights
+  if (restaurant.rating > 4.2) {
+    insights.push({
+      type: 'positive',
+      title: 'Excellent Customer Satisfaction',
+      description: `Rating of ${restaurant.rating} is above market average`,
+      impact: 'High'
+    });
+  } else if (restaurant.rating < 3.5) {
+    insights.push({
+      type: 'warning',
+      title: 'Below Average Rating',
+      description: 'Consider improving service quality and customer experience',
+      impact: 'High'
+    });
+  }
+  
+  // Competition insights
+  const areaCompetitors = competitors.filter(c => c.area === restaurant.area);
+  if (areaCompetitors.length > 10) {
+    insights.push({
+      type: 'info',
+      title: 'High Competition Area',
+      description: `${areaCompetitors.length} competitors in ${restaurant.area}`,
+      impact: 'Medium'
+    });
+  }
+  
+  // Price positioning
+  const avgPrice = competitors.reduce((sum, c) => sum + (c.medianPrice || 0), 0) / competitors.length;
+  if (restaurant.medianPrice > avgPrice * 1.2) {
+    insights.push({
+      type: 'info',
+      title: 'Premium Pricing',
+      description: 'Priced above market average - ensure value proposition is clear',
+      impact: 'Medium'
+    });
+  }
+  
+  return insights;
+}
+
+function getAreaBreakdown(restaurants) {
+  const areas = {};
+  restaurants.forEach(r => {
+    if (!areas[r.area]) {
+      areas[r.area] = { 
+        count: 0, 
+        totalRating: 0, 
+        totalPrice: 0, 
+        totalReviews: 0,
+        cuisines: new Set()
+      };
+    }
+    areas[r.area].count++;
+    areas[r.area].totalRating += r.rating || 0;
+    areas[r.area].totalPrice += r.medianPrice || 0;
+    areas[r.area].totalReviews += r.totalReviews || 0;
+    areas[r.area].cuisines.add(r.cuisine);
+  });
+  
+  return Object.entries(areas)
+    .map(([area, data]) => ({
+      area,
+      restaurantCount: data.count,
+      averageRating: (data.totalRating / data.count).toFixed(1),
+      averagePrice: Math.round(data.totalPrice / data.count),
+      totalReviews: data.totalReviews,
+      cuisineVariety: data.cuisines.size,
+      marketShare: (data.count / restaurants.length * 100).toFixed(1)
+    }))
+    .sort((a, b) => b.restaurantCount - a.restaurantCount);
+}
+
+function getCuisineAnalysis(restaurants) {
+  const cuisines = {};
+  restaurants.forEach(r => {
+    if (!cuisines[r.cuisine]) {
+      cuisines[r.cuisine] = { 
+        count: 0, 
+        totalRating: 0, 
+        totalPrice: 0,
+        areas: new Set()
+      };
+    }
+    cuisines[r.cuisine].count++;
+    cuisines[r.cuisine].totalRating += r.rating || 0;
+    cuisines[r.cuisine].totalPrice += r.medianPrice || 0;
+    cuisines[r.cuisine].areas.add(r.area);
+  });
+  
+  return Object.entries(cuisines)
+    .map(([cuisine, data]) => ({
+      cuisine,
+      restaurantCount: data.count,
+      averageRating: (data.totalRating / data.count).toFixed(1),
+      averagePrice: Math.round(data.totalPrice / data.count),
+      areaSpread: data.areas.size,
+      marketShare: (data.count / restaurants.length * 100).toFixed(1)
+    }))
+    .sort((a, b) => b.restaurantCount - a.restaurantCount);
+}
+
+function getPriceAnalysis(restaurants) {
+  const prices = restaurants.map(r => r.medianPrice || 0).filter(p => p > 0);
+  prices.sort((a, b) => a - b);
+  
+  const q1 = prices[Math.floor(prices.length * 0.25)];
+  const median = prices[Math.floor(prices.length * 0.5)];
+  const q3 = prices[Math.floor(prices.length * 0.75)];
+  
+  return {
+    min: Math.min(...prices),
+    max: Math.max(...prices),
+    average: Math.round(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+    median: Math.round(median),
+    quartiles: { q1: Math.round(q1), q3: Math.round(q3) },
+    distribution: {
+      budget: prices.filter(p => p < q1).length,
+      moderate: prices.filter(p => p >= q1 && p < q3).length,
+      premium: prices.filter(p => p >= q3).length
+    }
+  };
+}
+
+function getRatingAnalysis(restaurants) {
+  const ratings = restaurants.map(r => r.rating || 0).filter(r => r > 0);
+  
+  return {
+    average: (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(2),
+    distribution: {
+      excellent: ratings.filter(r => r >= 4.5).length,
+      good: ratings.filter(r => r >= 4.0 && r < 4.5).length,
+      average: ratings.filter(r => r >= 3.5 && r < 4.0).length,
+      poor: ratings.filter(r => r < 3.5).length
+    },
+    trends: {
+      improving: Math.floor(Math.random() * 20) + 10,
+      declining: Math.floor(Math.random() * 10) + 5,
+      stable: Math.floor(Math.random() * 30) + 20
+    }
+  };
+}
+
+function generateCompetitionHeatmap(restaurants) {
+  const heatmap = {};
+  restaurants.forEach(r => {
+    if (!heatmap[r.area]) {
+      heatmap[r.area] = { count: 0, density: 'Low' };
+    }
+    heatmap[r.area].count++;
+  });
+  
+  // Calculate density levels
+  Object.keys(heatmap).forEach(area => {
+    const count = heatmap[area].count;
+    if (count > 15) heatmap[area].density = 'Very High';
+    else if (count > 10) heatmap[area].density = 'High';
+    else if (count > 5) heatmap[area].density = 'Medium';
+    else heatmap[area].density = 'Low';
+  });
+  
+  return heatmap;
+}
+
+function identifyMarketOpportunities(restaurants) {
+  const opportunities = [];
+  
+  // Analyze cuisine gaps by area
+  const areasByCount = {};
+  restaurants.forEach(r => {
+    if (!areasByCount[r.area]) areasByCount[r.area] = [];
+    areasByCount[r.area].push(r.cuisine);
+  });
+  
+  Object.entries(areasByCount).forEach(([area, cuisines]) => {
+    const uniqueCuisines = new Set(cuisines);
+    const popularCuisines = ['Thai', 'Japanese', 'Italian', 'Chinese', 'Korean'];
+    
+    popularCuisines.forEach(cuisine => {
+      if (!uniqueCuisines.has(cuisine)) {
+        opportunities.push({
+          type: 'cuisine_gap',
+          area,
+          cuisine,
+          description: `No ${cuisine} restaurants in ${area}`,
+          potential: 'High'
+        });
+      }
+    });
+  });
+  
+  return opportunities.slice(0, 10); // Return top 10 opportunities
+}
 
 module.exports = router;

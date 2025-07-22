@@ -1,0 +1,57 @@
+[
+  {
+    "id": "1",
+    "brand": "McDonald's",
+    "city": "Bangkok",
+    "area": "Siam",
+    "cuisine": "Fast Food",
+    "rating": 4.2,
+    "totalReviews": 22450,
+    "medianPrice": 150,
+    "logo": "🍟"
+  },
+  {
+    "id": "2",
+    "brand": "Burger King",
+    "city": "Bangkok",
+    "area": "Sukhumvit",
+    "cuisine": "Fast Food",
+    "rating": 4.1,
+    "totalReviews": 9517,
+    "medianPrice": 120,
+    "logo": "👑"
+  },
+  {
+    "id": "3",
+    "brand": "Starbucks",
+    "city": "Bangkok",
+    "area": "Phrom Phong",
+    "cuisine": "Coffee",
+    "rating": 4.3,
+    "totalReviews": 12890,
+    "medianPrice": 180,
+    "logo": "☕"
+  },
+  {
+    "id": "4",
+    "brand": "KFC",
+    "city": "Bangkok",
+    "area": "Chatuchak",
+    "cuisine": "Fast Food",
+    "rating": 4,
+    "totalReviews": 15230,
+    "medianPrice": 140,
+    "logo": "🍗"
+  },
+  {
+    "id": "5",
+    "brand": "Pizza Hut",
+    "city": "Bangkok",
+    "area": "Silom",
+    "cuisine": "Pizza",
+    "rating": 3.9,
+    "totalReviews": 8765,
+    "medianPrice": 280,
+    "logo": "🍕"
+  }
+]

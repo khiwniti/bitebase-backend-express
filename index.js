@@ -598,6 +598,7 @@ const adminRoutes = require('./routes/admin');
 const restaurantRoutes = require('./routes/restaurants');
 const aiRoutes = require('./routes/ai');
 const paymentRoutes = require('./routes/payments');
+const locationIntelligenceRoutes = require('./routes/locationIntelligence');
 
 // Set up database pool for auth routes if using SQLite
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('sqlite:') && authRoutes.setPool) {
@@ -617,6 +618,9 @@ app.use('/api/admin', adminRoutes);
 
 // Mount location intelligence routes
 app.use('/api/location', locationRouter);
+
+// Mount location intelligence search routes
+app.use('/api/location-intelligence', rateLimiters.search, locationIntelligenceRoutes);
 
 // Mount MCP routes
 app.use('/api/mcp', createMCPMiddleware());
