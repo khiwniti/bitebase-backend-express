@@ -162,23 +162,48 @@ const getAllowedOrigins = () => {
   return baseOrigins;
 };
 
-app.use(
-  cors({
-    origin: getAllowedOrigins(),
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: [
-      "Content-Type", 
-      "Authorization", 
-      "X-Requested-With",
-      "X-API-Key",
-      "Origin",
-      "Accept"
-    ],
-    exposedHeaders: ["X-Total-Count", "X-Rate-Limit-Remaining"],
-    maxAge: 86400, // 24 hours
-  }),
-);
+// Enhanced CORS configuration for production
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = getAllowedOrigins();
+    
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`❌ CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: [
+    "Content-Type", 
+    "Authorization", 
+    "X-Requested-With",
+    "X-API-Key",
+    "Origin",
+    "Accept",
+    "Cache-Control"
+  ],
+  exposedHeaders: ["X-Total-Count", "X-Rate-Limit-Remaining"],
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 200 // For legacy browser support
+};
+
+app.use(cors(corsOptions));
 
 // Apply security middleware
 app.use(...basicSecurity());

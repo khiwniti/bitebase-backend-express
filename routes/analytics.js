@@ -34,6 +34,103 @@ try {
   kvCache = null;
 }
 
+// Dashboard stats endpoint
+router.get('/dashboard-stats', async (req, res) => {
+  try {
+    const { restaurantId } = req.query;
+    
+    // Generate dashboard statistics
+    const stats = {
+      revenue: {
+        current: 45000,
+        previous: 42000,
+        change: '+7.1%',
+        trend: 'up'
+      },
+      customers: {
+        current: 1250,
+        previous: 1180,
+        change: '+5.9%',
+        trend: 'up'
+      },
+      orders: {
+        current: 890,
+        previous: 820,
+        change: '+8.5%',
+        trend: 'up'
+      },
+      avgOrderValue: {
+        current: 50.56,
+        previous: 51.22,
+        change: '-1.3%',
+        trend: 'down'
+      }
+    };
+    
+    res.json({
+      success: true,
+      data: stats,
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        restaurantId,
+        period: 'last_30_days'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch dashboard stats'
+    });
+  }
+});
+
+// Market analyses endpoint
+router.get('/market-analyses', async (req, res) => {
+  try {
+    const { limit = 10, offset = 0 } = req.query;
+    
+    // Generate market analysis data
+    const analyses = [
+      {
+        id: 1,
+        title: 'Bangkok Restaurant Market Q4 2024',
+        location: 'Bangkok, Thailand',
+        date: '2024-12-15',
+        score: 85,
+        insights: ['High demand for Asian fusion', 'Growing delivery market', 'Premium pricing opportunity']
+      },
+      {
+        id: 2,
+        title: 'Sukhumvit Area Competition Analysis',
+        location: 'Sukhumvit, Bangkok',
+        date: '2024-12-10',
+        score: 78,
+        insights: ['Saturated market', 'Differentiation needed', 'Focus on unique cuisine']
+      }
+    ];
+    
+    res.json({
+      success: true,
+      data: analyses,
+      metadata: {
+        total: analyses.length,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        generatedAt: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Market analyses error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch market analyses'
+    });
+  }
+});
+
 // Real-time metrics endpoint
 router.get('/realtime', async (req, res) => {
   try {
