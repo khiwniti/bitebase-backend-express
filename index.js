@@ -148,7 +148,9 @@ const getAllowedOrigins = () => {
       "https://bitebase.app",
       "https://www.bitebase.app",
       "https://khiwniti.github.io",
-      "https://beta-bitebase-app.vercel.app"
+      "https://beta-bitebase-app.vercel.app",
+      // Support Vercel preview deployments
+      /^https:\/\/.*\.vercel\.app$/
     );
   }
   
