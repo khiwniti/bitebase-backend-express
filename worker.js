@@ -96,6 +96,80 @@ const routes = {
     headers: { 'Content-Type': 'application/json' }
   }),
 
+  // AI chat (for demographics and other AI queries)
+  '/api/ai/chat': async (request) => {
+    try {
+      const body = await request.json();
+      const message = body.message || '';
+      
+      // Mock demographics response for location queries
+      if (message.toLowerCase().includes('demographics') || message.toLowerCase().includes('bangkok')) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            response: "Bangkok Demographics Analysis",
+            demographics: [
+              {
+                area: "Sukhumvit",
+                population: 125000,
+                medianIncome: 45000,
+                ageGroups: {
+                  "18-25": 25,
+                  "26-35": 35,
+                  "36-50": 25,
+                  "51-65": 10,
+                  "65+": 5
+                },
+                coordinates: [[13.7563, 100.5018], [13.7600, 100.5100], [13.7500, 100.5200]]
+              },
+              {
+                area: "Silom",
+                population: 98000,
+                medianIncome: 52000,
+                ageGroups: {
+                  "18-25": 20,
+                  "26-35": 40,
+                  "36-50": 30,
+                  "51-65": 8,
+                  "65+": 2
+                },
+                coordinates: [[13.7250, 100.5350], [13.7300, 100.5400], [13.7200, 100.5300]]
+              }
+            ]
+          },
+          metadata: { generatedAt: new Date().toISOString() }
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Generic AI response
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          response: "I'm here to help with your restaurant business intelligence needs. What would you like to know?",
+          suggestions: [
+            "Market analysis for Bangkok",
+            "Demographics data",
+            "Competition analysis",
+            "Location recommendations"
+          ]
+        },
+        metadata: { generatedAt: new Date().toISOString() }
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid request format'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  },
+
   // Dashboard stats
   '/api/analytics/dashboard-stats': () => new Response(JSON.stringify({
     success: true,
@@ -123,13 +197,36 @@ const routes = {
     headers: { 'Content-Type': 'application/json' }
   }),
 
-  // Restaurant search
+  // Restaurant search (supports both query and location-based search)
   '/api/restaurants/search': (request) => {
     const url = new URL(request.url);
     const query = url.searchParams.get('q') || '';
-    const filtered = mockRestaurants.filter(r => 
-      r.name.toLowerCase().includes(query.toLowerCase())
-    );
+    const latitude = parseFloat(url.searchParams.get('latitude') || '0');
+    const longitude = parseFloat(url.searchParams.get('longitude') || '0');
+    const radius = parseInt(url.searchParams.get('radius') || '5000');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    
+    let filtered = mockRestaurants;
+    
+    // Filter by text query if provided
+    if (query) {
+      filtered = filtered.filter(r => 
+        r.name.toLowerCase().includes(query.toLowerCase()) ||
+        r.cuisine.toLowerCase().includes(query.toLowerCase())
+      );
+    }
+    
+    // For location-based search, return all restaurants with position data
+    if (latitude && longitude) {
+      filtered = filtered.map(r => ({
+        ...r,
+        position: [r.location.lat, r.location.lng],
+        distance: Math.random() * radius // Mock distance calculation
+      }));
+    }
+    
+    // Apply limit
+    filtered = filtered.slice(0, limit);
     
     return new Response(JSON.stringify({
       success: true,
@@ -137,6 +234,9 @@ const routes = {
       metadata: { 
         total: filtered.length,
         query,
+        latitude,
+        longitude,
+        radius,
         generatedAt: new Date().toISOString()
       }
     }), {
