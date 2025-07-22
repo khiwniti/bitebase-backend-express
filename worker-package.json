@@ -1,0 +1,17 @@
+{
+  "name": "bitebase-worker",
+  "version": "2.0.0",
+  "description": "BiteBase API - Cloudflare Worker",
+  "main": "worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "keywords": ["cloudflare", "worker", "api", "bitebase"],
+  "author": "BiteBase Team",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
