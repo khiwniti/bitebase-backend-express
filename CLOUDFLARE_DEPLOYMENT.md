@@ -1,8 +1,10 @@
-# BiteBase Backend - Cloudflare Workers Deployment Guide
+# 🚀 BiteBase API - Cloudflare Workers Deployment Guide
 
 ## Overview
 
-This guide explains how to deploy the BiteBase backend to Cloudflare Workers for global edge deployment with automatic scaling.
+**UPDATED**: Lightweight worker deployment optimized for production performance at `api.bitebase.app`.
+
+This guide explains how to deploy the optimized BiteBase backend to Cloudflare Workers for global edge deployment with automatic scaling.
 
 ## Prerequisites
 
