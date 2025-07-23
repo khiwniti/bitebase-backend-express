@@ -135,6 +135,7 @@ const getAllowedOrigins = () => {
       "http://localhost:3000",
       "http://localhost:3001",
       "http://localhost:50129",
+      "http://localhost:50513",
       "http://localhost:52580",
       "http://localhost:54538",
       "http://localhost:56222",
