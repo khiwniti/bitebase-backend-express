@@ -13,6 +13,8 @@ if (!stripe) {
   console.log('⚠️ Stripe not initialized - STRIPE_SECRET_KEY not provided');
 }
 const CloudflareAI = require('./services/CloudflareAI');
+const wongnaiService = require('./services/wongnaiService');
+const restaurantBufferService = require('./services/restaurantBufferService');
 
 // Import security and monitoring middleware
 const { 
@@ -235,7 +237,8 @@ if (process.env.MAPBOX_API_KEY) {
   const apiKey = process.env.MAPBOX_API_KEY.trim();
   if (apiKey.startsWith("pk.") && apiKey.length > 20) {
     try {
-      mapboxClient = mapboxSdk({ accessToken: apiKey });
+      const mapboxServices = require('@mapbox/mapbox-sdk/services/geocoding');
+      mapboxClient = mapboxServices(mapboxSdk({ accessToken: apiKey }));
       console.log("✅ Mapbox client initialized successfully");
     } catch (error) {
       console.error("❌ Failed to initialize Mapbox client:", error.message);
@@ -614,11 +617,6 @@ app.get("/api/restaurants/:id/analytics", async (req, res) => {
 // Location Intelligence Routes
 const { router: locationRouter, initializeLocationService } = require('./routes/location');
 
-// Restaurant Buffer Service
-const restaurantBufferService = require('./services/restaurantBufferService');
-const GooglePlacesService = require('./services/googlePlacesService');
-const googlePlacesService = new GooglePlacesService();
-
 // Add database reference to requests for location service
 app.use((req, res, next) => {
   req.db = pool;
@@ -643,85 +641,244 @@ if (restaurantRoutes.initializeWithPool) {
   restaurantRoutes.initializeWithPool(pool);
 }
 
-// ==================== RESTAURANT BUFFER API ENDPOINTS ====================
-
-// Get buffer system statistics
-// Customer Analytics API endpoints
-app.get('/api/customers/demographics/:lat/:lng', async (req, res) => {
+// User Location Tracking Routes
+app.post('/user/location/update', async (req, res) => {
   try {
-    const { lat, lng } = req.params;
-    const radius = req.query.radius || 5000;
-    
-    const demographics = await googlePlacesService.analyzeCustomerDemographics(
-      parseFloat(lat), 
-      parseFloat(lng), 
-      parseInt(radius)
-    );
-    
-    res.json(demographics);
-  } catch (error) {
-    console.error('Customer demographics error:', error);
-    res.status(500).json({ error: 'Failed to analyze customer demographics' });
-  }
-});
+    const { userId, latitude, longitude, accuracy, sessionId } = req.body;
 
-app.get('/api/customers/insights/:lat/:lng', async (req, res) => {
-  try {
-    const { lat, lng } = req.params;
-    const radius = req.query.radius || 5000;
-    
-    const insights = await googlePlacesService.getCustomerInsights(
-      parseFloat(lat), 
-      parseFloat(lng), 
-      parseInt(radius)
-    );
-    
-    res.json(insights);
-  } catch (error) {
-    console.error('Customer insights error:', error);
-    res.status(500).json({ error: 'Failed to get customer insights' });
-  }
-});
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required',
+        timestamp: new Date().toISOString()
+      });
+    }
 
-app.get('/api/customers/nearby-places/:lat/:lng', async (req, res) => {
-  try {
-    const { lat, lng } = req.params;
-    const radius = req.query.radius || 5000;
-    const type = req.query.type || 'restaurant';
-    
-    const places = await googlePlacesService.searchPlacesInRadius(
-      parseFloat(lat), 
-      parseFloat(lng), 
-      parseInt(radius),
-      type
-    );
-    
-    res.json(places);
-  } catch (error) {
-    console.error('Nearby places error:', error);
-    res.status(500).json({ error: 'Failed to get nearby places' });
-  }
-});
+    // Store location in memory for now (can be extended to database later)
+    const locationData = {
+      userId: userId || 'anonymous',
+      sessionId: sessionId || 'default',
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      accuracy: accuracy || 10,
+      timestamp: new Date().toISOString()
+    };
 
-app.get('/api/restaurants/buffer/stats', async (req, res) => {
-  try {
-    const stats = restaurantBufferService.getBufferStats();
-    
+    console.log(`📍 Location updated for user ${locationData.userId}: ${latitude}, ${longitude}`);
+
+    // Use Mapbox to get location details if available
+    let locationDetails = null;
+    if (mapboxClient) {
+      try {
+        const response = await mapboxClient.reverseGeocode({
+          query: [longitude, latitude],
+          limit: 1
+        }).send();
+
+        if (response.body.features && response.body.features.length > 0) {
+          const feature = response.body.features[0];
+          locationDetails = {
+            address: feature.place_name,
+            context: feature.context || []
+          };
+        }
+      } catch (mapboxError) {
+        console.log('Mapbox reverse geocoding failed:', mapboxError.message);
+      }
+    }
+
     res.json({
       success: true,
-      data: stats,
+      message: 'Location updated successfully',
+      data: {
+        location: locationData,
+        details: locationDetails
+      },
       timestamp: new Date().toISOString()
     });
+
   } catch (error) {
-    console.error('Restaurant buffer stats error:', error);
+    console.error('Location update error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch buffer statistics',
+      message: 'Failed to update location',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString()
     });
   }
 });
+
+// Get user's current location
+app.get('/user/location/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // For now, return a mock response since we're storing in memory
+    // In production, this would query the database
+    res.json({
+      success: true,
+      message: 'Location retrieved successfully',
+      data: {
+        userId,
+        message: 'Location tracking is active. Use POST /user/location/update to update location.'
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Location retrieval error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve location',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Wongnai Integration API Endpoints
+app.get('/api/wongnai/restaurant/:publicId/menu', async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    console.log(`🍽️ Fetching Wongnai menu for restaurant: ${publicId}`);
+    
+    const menuData = await wongnaiService.getRestaurantMenu(publicId);
+    
+    res.json({
+      success: true,
+      message: 'Menu data retrieved successfully',
+      data: menuData,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Wongnai menu fetch error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch menu data',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/wongnai/search', async (req, res) => {
+  try {
+    const { query, location, cuisine, priceRange, rating } = req.query;
+    console.log('🔍 Wongnai restaurant search:', req.query);
+    
+    const searchResults = await wongnaiService.searchRestaurants({
+      query,
+      location,
+      cuisine,
+      priceRange,
+      rating: rating ? parseFloat(rating) : undefined
+    });
+    
+    res.json({
+      success: true,
+      message: 'Restaurant search completed',
+      data: {
+        restaurants: searchResults,
+        count: searchResults.length
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Wongnai search error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search restaurants',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/wongnai/restaurant/:publicId/reviews', async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    const { limit = 10 } = req.query;
+    console.log(`📝 Fetching Wongnai reviews for restaurant: ${publicId}`);
+    
+    const reviews = await wongnaiService.getRestaurantReviews(publicId, parseInt(limit));
+    
+    res.json({
+      success: true,
+      message: 'Reviews retrieved successfully',
+      data: {
+        reviews,
+        count: reviews.length
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Wongnai reviews fetch error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch reviews',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/wongnai/trending', async (req, res) => {
+  try {
+    const { location = 'bangkok' } = req.query;
+    console.log(`📈 Fetching trending dishes for: ${location}`);
+    
+    const trendingDishes = await wongnaiService.getTrendingDishes(location);
+    
+    res.json({
+      success: true,
+      message: 'Trending dishes retrieved successfully',
+      data: {
+        dishes: trendingDishes,
+        location,
+        count: trendingDishes.length
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Wongnai trending fetch error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch trending dishes',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/wongnai/market-insights', async (req, res) => {
+  try {
+    const { location, cuisine, timeframe } = req.query;
+    console.log('📊 Generating Wongnai market insights:', req.query);
+    
+    const insights = await wongnaiService.getMarketInsights({
+      location,
+      cuisine,
+      timeframe
+    });
+    
+    res.json({
+      success: true,
+      message: 'Market insights generated successfully',
+      data: insights,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Wongnai insights error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate market insights',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ==================== RESTAURANT BUFFER API ENDPOINTS ====================
 
 // Get restaurants within buffer radius
 app.get('/api/restaurants/buffer', async (req, res) => {
@@ -739,6 +896,7 @@ app.get('/api/restaurants/buffer', async (req, res) => {
     
     const bufferRadius = radius ? parseInt(radius) : undefined;
     const restaurants = restaurantBufferService.getRestaurantsInBuffer(bufferRadius, centerPoint);
+    
     
     res.json({
       success: true,
@@ -790,6 +948,7 @@ app.get('/api/restaurants/buffer/search', async (req, res) => {
     
     const restaurants = restaurantBufferService.searchRestaurants(searchCriteria);
     
+    
     res.json({
       success: true,
       data: {
@@ -804,6 +963,62 @@ app.get('/api/restaurants/buffer/search', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to search restaurants in buffer',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get buffer system statistics
+app.get('/api/restaurants/buffer/stats', async (req, res) => {
+  try {
+    const stats = restaurantBufferService.getBufferStats();
+    
+    
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Restaurant buffer stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch buffer statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get market density analysis for buffer area
+app.get('/api/restaurants/buffer/market-density', async (req, res) => {
+  try {
+    const { lat, lng, radius, name } = req.query;
+    
+    let centerPoint = null;
+    if (lat && lng) {
+      centerPoint = {
+        latitude: parseFloat(lat),
+        longitude: parseFloat(lng),
+        name: name || 'Analysis Center'
+      };
+    }
+    
+    const analysisRadius = radius ? parseInt(radius) : undefined;
+    const marketDensity = restaurantBufferService.getMarketDensity(centerPoint, analysisRadius);
+    
+    
+    res.json({
+      success: true,
+      data: marketDensity,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Market density analysis error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to analyze market density',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString()
     });
@@ -834,108 +1049,6 @@ app.get('/api/restaurants/buffer/cuisine/:cuisine', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch restaurants by cuisine',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Restaurant Buffer - Market Density Analysis
-app.get('/api/restaurants/buffer/market-density', rateLimiters.search, (req, res) => {
-  try {
-    const { radius = 5000, grid_size = 1000 } = req.query;
-    const bufferRadius = parseInt(radius);
-    const gridSize = parseInt(grid_size);
-    
-    console.log(`📊 Analyzing market density with ${bufferRadius}m radius and ${gridSize}m grid`);
-    
-    const densityAnalysis = restaurantBufferService.getMarketDensityAnalysis(bufferRadius, gridSize);
-    
-    console.log(`📊 Market density analysis completed for ${densityAnalysis.total_restaurants} restaurants`);
-    
-    res.json({
-      success: true,
-      data: {
-        analysis_parameters: {
-          radius_meters: bufferRadius,
-          grid_size_meters: gridSize,
-          base_location: restaurantBufferService.baseLocation
-        },
-        density_metrics: densityAnalysis,
-        recommendations: {
-          high_density_areas: densityAnalysis.grid_analysis.filter(g => g.restaurant_count >= 3),
-          low_competition_areas: densityAnalysis.grid_analysis.filter(g => g.restaurant_count <= 1),
-          optimal_locations: densityAnalysis.grid_analysis
-            .filter(g => g.restaurant_count >= 1 && g.restaurant_count <= 2)
-            .sort((a, b) => b.avg_rating - a.avg_rating)
-            .slice(0, 5)
-        }
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Restaurant buffer market density error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to analyze market density',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Restaurant Buffer - Update Base Location
-app.put('/api/restaurants/buffer/base-location', rateLimiters.search, (req, res) => {
-  try {
-    const { latitude, longitude, name } = req.body;
-    
-    if (!latitude || !longitude) {
-      return res.status(400).json({
-        success: false,
-        message: 'Latitude and longitude are required',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-    
-    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid coordinates provided',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    console.log(`📍 Updating base location to: ${lat}, ${lng} (${name || 'Unnamed Location'})`);
-    
-    const oldLocation = { ...restaurantBufferService.baseLocation };
-    const updatedLocation = restaurantBufferService.updateBaseLocation(lat, lng, name);
-    
-    // Get updated statistics with new base location
-    const newStats = restaurantBufferService.getBufferStats();
-    
-    console.log(`📍 Base location updated successfully`);
-    
-    res.json({
-      success: true,
-      data: {
-        previous_location: oldLocation,
-        new_location: updatedLocation,
-        updated_statistics: newStats,
-        impact_analysis: {
-          restaurants_in_new_buffer: newStats.restaurants_in_default_buffer,
-          coverage_change: `${((newStats.restaurants_in_default_buffer / newStats.total_restaurants) * 100).toFixed(1)}%`
-        }
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Restaurant buffer base location update error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update base location',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString()
     });
@@ -985,15 +1098,46 @@ app.get('/api/restaurants/buffer/:id', async (req, res) => {
 });
 
 
+
+// Update base location for buffer system
+app.post('/api/restaurants/buffer/base-location', async (req, res) => {
+  try {
+    const { latitude, longitude, name } = req.body;
+    
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    const newLocation = {
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+      name: name || 'Updated Base Location'
+    };
+    
+    restaurantBufferService.updateBaseLocation(newLocation);
+    
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Restaurant buffer base location update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update base location',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Mount auth routes with rate limiting
 app.use('/api/auth', rateLimiters.auth, authRoutes);
 
 // Mount admin routes
 app.use('/api/admin', adminRoutes);
-
-// Mount reports routes
-const reportsRoutes = require('./routes/reports');
-app.use('/api/reports', reportsRoutes);
 
 // Mount location intelligence routes
 app.use('/api/location', locationRouter);

@@ -1,0 +1,108 @@
+{
+  "id": "customer_1753268355337",
+  "type": "customer",
+  "title": "Customer Demographics & Analytics Report",
+  "generatedAt": "2025-07-23T10:59:15.338Z",
+  "location": {
+    "lat": 13.7563,
+    "lng": 100.5018
+  },
+  "radius": 5000,
+  "data": {
+    "demographics": {
+      "totalCustomers": 2500,
+      "newCustomers": 350,
+      "returningCustomers": 2150,
+      "customerSegments": [
+        {
+          "segment": "Families with Children",
+          "percentage": 35,
+          "characteristics": [
+            "Weekend dining",
+            "Larger orders",
+            "Kid-friendly preferences"
+          ],
+          "avgSpending": 120
+        },
+        {
+          "segment": "Working Professionals",
+          "percentage": 40,
+          "characteristics": [
+            "Lunch orders",
+            "Quick service",
+            "Higher spending"
+          ],
+          "avgSpending": 85
+        },
+        {
+          "segment": "Students",
+          "percentage": 15,
+          "characteristics": [
+            "Budget-conscious",
+            "Evening orders",
+            "Group dining"
+          ],
+          "avgSpending": 45
+        },
+        {
+          "segment": "Tourists",
+          "percentage": 10,
+          "characteristics": [
+            "Authentic cuisine",
+            "Photo-friendly",
+            "Cultural experience"
+          ],
+          "avgSpending": 95
+        }
+      ]
+    },
+    "behaviorAnalysis": {
+      "visitFrequency": {
+        "daily": 5,
+        "weekly": 25,
+        "monthly": 45,
+        "occasional": 25
+      },
+      "preferredTimes": [
+        {
+          "time": "12:00-14:00",
+          "percentage": 35
+        },
+        {
+          "time": "18:00-20:00",
+          "percentage": 40
+        },
+        {
+          "time": "20:00-22:00",
+          "percentage": 15
+        },
+        {
+          "time": "Other",
+          "percentage": 10
+        }
+      ]
+    },
+    "marketOpportunities": [
+      {
+        "opportunity": "Family Meal Packages",
+        "potential": "High",
+        "description": "Large family segment suggests opportunity for family meal deals"
+      },
+      {
+        "opportunity": "Lunch Express Menu",
+        "potential": "High",
+        "description": "Working professionals need quick lunch options"
+      },
+      {
+        "opportunity": "Student Discounts",
+        "potential": "Medium",
+        "description": "Student segment is price-sensitive but loyal"
+      }
+    ]
+  },
+  "insights": [
+    "Working professionals represent the largest customer segment (40%)",
+    "Peak dining times align with standard meal hours",
+    "Family segment shows highest average spending per visit"
+  ]
+}

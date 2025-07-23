@@ -1,0 +1,304 @@
+{
+  "id": "sales_1753262099942",
+  "type": "sales",
+  "title": "Sales Performance Report",
+  "generatedAt": "2025-07-23T09:14:59.942Z",
+  "dateRange": {
+    "start": "2024-01-01",
+    "end": "2024-01-31"
+  },
+  "location": {
+    "lat": 13.7563,
+    "lng": 100.5018
+  },
+  "data": {
+    "summary": {
+      "totalRevenue": 125000,
+      "totalOrders": 1250,
+      "averageOrderValue": 100,
+      "growthRate": 15.5
+    },
+    "dailySales": [
+      {
+        "date": "2024-01-01",
+        "revenue": 2472,
+        "orders": 51
+      },
+      {
+        "date": "2024-01-02",
+        "revenue": 4352,
+        "orders": 62
+      },
+      {
+        "date": "2024-01-03",
+        "revenue": 6227,
+        "orders": 55
+      },
+      {
+        "date": "2024-01-04",
+        "revenue": 5897,
+        "orders": 33
+      },
+      {
+        "date": "2024-01-05",
+        "revenue": 6677,
+        "orders": 45
+      },
+      {
+        "date": "2024-01-06",
+        "revenue": 5554,
+        "orders": 22
+      },
+      {
+        "date": "2024-01-07",
+        "revenue": 3656,
+        "orders": 39
+      },
+      {
+        "date": "2024-01-08",
+        "revenue": 2579,
+        "orders": 36
+      },
+      {
+        "date": "2024-01-09",
+        "revenue": 2612,
+        "orders": 32
+      },
+      {
+        "date": "2024-01-10",
+        "revenue": 6910,
+        "orders": 42
+      },
+      {
+        "date": "2024-01-11",
+        "revenue": 2785,
+        "orders": 60
+      },
+      {
+        "date": "2024-01-12",
+        "revenue": 3779,
+        "orders": 39
+      },
+      {
+        "date": "2024-01-13",
+        "revenue": 5538,
+        "orders": 26
+      },
+      {
+        "date": "2024-01-14",
+        "revenue": 6017,
+        "orders": 37
+      },
+      {
+        "date": "2024-01-15",
+        "revenue": 3414,
+        "orders": 60
+      },
+      {
+        "date": "2024-01-16",
+        "revenue": 5323,
+        "orders": 68
+      },
+      {
+        "date": "2024-01-17",
+        "revenue": 2821,
+        "orders": 42
+      },
+      {
+        "date": "2024-01-18",
+        "revenue": 3761,
+        "orders": 23
+      },
+      {
+        "date": "2024-01-19",
+        "revenue": 5642,
+        "orders": 39
+      },
+      {
+        "date": "2024-01-20",
+        "revenue": 3489,
+        "orders": 30
+      },
+      {
+        "date": "2024-01-21",
+        "revenue": 3990,
+        "orders": 65
+      },
+      {
+        "date": "2024-01-22",
+        "revenue": 6841,
+        "orders": 36
+      },
+      {
+        "date": "2024-01-23",
+        "revenue": 3368,
+        "orders": 49
+      },
+      {
+        "date": "2024-01-24",
+        "revenue": 3628,
+        "orders": 43
+      },
+      {
+        "date": "2024-01-25",
+        "revenue": 2266,
+        "orders": 43
+      },
+      {
+        "date": "2024-01-26",
+        "revenue": 6399,
+        "orders": 24
+      },
+      {
+        "date": "2024-01-27",
+        "revenue": 3305,
+        "orders": 63
+      },
+      {
+        "date": "2024-01-28",
+        "revenue": 3751,
+        "orders": 51
+      },
+      {
+        "date": "2024-01-29",
+        "revenue": 5919,
+        "orders": 68
+      },
+      {
+        "date": "2024-01-30",
+        "revenue": 5660,
+        "orders": 23
+      },
+      {
+        "date": "2024-01-31",
+        "revenue": 6744,
+        "orders": 69
+      }
+    ],
+    "topProducts": [
+      {
+        "name": "Pad Thai",
+        "sales": 45000,
+        "orders": 450
+      },
+      {
+        "name": "Green Curry",
+        "sales": 38000,
+        "orders": 380
+      },
+      {
+        "name": "Tom Yum Soup",
+        "sales": 32000,
+        "orders": 320
+      }
+    ],
+    "hourlyDistribution": [
+      {
+        "hour": "00:00",
+        "sales": 182
+      },
+      {
+        "hour": "01:00",
+        "sales": 78
+      },
+      {
+        "hour": "02:00",
+        "sales": 72
+      },
+      {
+        "hour": "03:00",
+        "sales": 59
+      },
+      {
+        "hour": "04:00",
+        "sales": 69
+      },
+      {
+        "hour": "05:00",
+        "sales": 106
+      },
+      {
+        "hour": "06:00",
+        "sales": 116
+      },
+      {
+        "hour": "07:00",
+        "sales": 496
+      },
+      {
+        "hour": "08:00",
+        "sales": 201
+      },
+      {
+        "hour": "09:00",
+        "sales": 276
+      },
+      {
+        "hour": "10:00",
+        "sales": 307
+      },
+      {
+        "hour": "11:00",
+        "sales": 1398
+      },
+      {
+        "hour": "12:00",
+        "sales": 1310
+      },
+      {
+        "hour": "13:00",
+        "sales": 1787
+      },
+      {
+        "hour": "14:00",
+        "sales": 974
+      },
+      {
+        "hour": "15:00",
+        "sales": 204
+      },
+      {
+        "hour": "16:00",
+        "sales": 108
+      },
+      {
+        "hour": "17:00",
+        "sales": 1687
+      },
+      {
+        "hour": "18:00",
+        "sales": 1049
+      },
+      {
+        "hour": "19:00",
+        "sales": 1820
+      },
+      {
+        "hour": "20:00",
+        "sales": 1761
+      },
+      {
+        "hour": "21:00",
+        "sales": 1486
+      },
+      {
+        "hour": "22:00",
+        "sales": 144
+      },
+      {
+        "hour": "23:00",
+        "sales": 127
+      }
+    ],
+    "paymentMethods": {
+      "cash": 35,
+      "card": 45,
+      "digital": 20
+    }
+  },
+  "insights": [
+    "Peak sales occur between 12:00-14:00 and 18:00-20:00",
+    "Digital payments increased by 25% this month",
+    "Pad Thai remains the top-selling item with consistent growth"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "id": "market_1753268943786",
+  "type": "market",
+  "title": "Market Analysis & Competitive Intelligence",
+  "generatedAt": "2025-07-23T11:09:03.786Z",
+  "location": {
+    "lat": 13.7563,
+    "lng": 100.5018
+  },
+  "data": {
+    "marketOverview": {
+      "marketSize": 2500000,
+      "growthRate": 8.5,
+      "competitorCount": 45,
+      "marketShare": 12.5
+    },
+    "competitorAnalysis": [
+      {
+        "name": "Thai Garden Restaurant",
+        "distance": 0.5,
+        "rating": 4.2,
+        "priceRange": "$$",
+        "strengths": [
+          "Authentic cuisine",
+          "Good location"
+        ],
+        "weaknesses": [
+          "Limited seating",
+          "Slow service"
+        ]
+      },
+      {
+        "name": "Bangkok Bistro",
+        "distance": 0.8,
+        "rating": 4.4,
+        "priceRange": "$$$",
+        "strengths": [
+          "Premium ambiance",
+          "Excellent service"
+        ],
+        "weaknesses": [
+          "High prices",
+          "Limited parking"
+        ]
+      }
+    ],
+    "marketGaps": [
+      "Fast-casual Thai dining",
+      "Healthy Thai options",
+      "Late-night Thai food"
+    ],
+    "opportunities": [
+      {
+        "opportunity": "Health-Conscious Menu",
+        "market": "Growing health food trend",
+        "potential": "High"
+      },
+      {
+        "opportunity": "Delivery Optimization",
+        "market": "Increasing delivery demand",
+        "potential": "Medium"
+      }
+    ]
+  },
+  "insights": [
+    "Market shows strong growth potential with 8.5% annual growth",
+    "Limited competition in fast-casual segment",
+    "Health-conscious dining trend presents opportunity"
+  ]
+}

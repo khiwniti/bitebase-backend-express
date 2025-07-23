@@ -1,0 +1,92 @@
+{
+  "id": "competitor_1753268948626",
+  "type": "competitor",
+  "title": "Competitive Analysis Report",
+  "generatedAt": "2025-07-23T11:09:08.626Z",
+  "data": {
+    "competitorOverview": {
+      "totalCompetitors": 15,
+      "directCompetitors": 8,
+      "indirectCompetitors": 7,
+      "averageRating": 4.2
+    },
+    "detailedAnalysis": [
+      {
+        "name": "Spice Garden",
+        "type": "Direct Competitor",
+        "distance": 0.3,
+        "rating": 4.5,
+        "reviews": 1250,
+        "priceRange": "$$",
+        "cuisine": "Thai",
+        "strengths": [
+          "Authentic flavors",
+          "Fast service",
+          "Good value"
+        ],
+        "weaknesses": [
+          "Limited seating",
+          "No delivery"
+        ],
+        "menuHighlights": [
+          "Pad Thai",
+          "Green Curry",
+          "Mango Sticky Rice"
+        ],
+        "estimatedRevenue": 85000,
+        "marketShare": 8.5
+      },
+      {
+        "name": "Golden Dragon",
+        "type": "Indirect Competitor",
+        "distance": 0.6,
+        "rating": 4.1,
+        "reviews": 890,
+        "priceRange": "$$$",
+        "cuisine": "Asian Fusion",
+        "strengths": [
+          "Premium ambiance",
+          "Unique dishes"
+        ],
+        "weaknesses": [
+          "High prices",
+          "Slow service"
+        ],
+        "menuHighlights": [
+          "Fusion Curry",
+          "Dragon Roll",
+          "Sake Selection"
+        ],
+        "estimatedRevenue": 120000,
+        "marketShare": 12
+      }
+    ],
+    "swotAnalysis": {
+      "strengths": [
+        "Unique positioning",
+        "Quality ingredients",
+        "Good location"
+      ],
+      "weaknesses": [
+        "New brand",
+        "Limited marketing",
+        "Small team"
+      ],
+      "opportunities": [
+        "Growing market",
+        "Digital presence",
+        "Catering services"
+      ],
+      "threats": [
+        "Established competitors",
+        "Rising costs",
+        "Economic uncertainty"
+      ]
+    }
+  },
+  "recommendations": [
+    "Focus on unique value proposition to differentiate from competitors",
+    "Invest in digital marketing to compete with established brands",
+    "Consider competitive pricing strategy for market entry"
+  ]
+}
